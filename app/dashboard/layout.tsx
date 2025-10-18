@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { signOut } from "next-auth/react";
+
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -109,8 +111,13 @@ export default function DashboardLayout({
               <p className="text-sm font-medium truncate">User Name</p>
               <p className="text-xs text-muted-foreground truncate">user@example.com</p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <LogOut className="h-4 w-4" />
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                >
+                <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -121,10 +128,14 @@ export default function DashboardLayout({
         {/* Desktop Header */}
         <header className="hidden lg:flex sticky top-0 z-40 h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
           <h2 className="text-xl font-semibold">Dashboard</h2>
-          <Button variant="outline" size="sm">
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+            </Button>
         </header>
 
         {/* Page Content */}
