@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 
 
 const navigation = [
@@ -37,6 +37,11 @@ export default function DashboardLayout({
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const businessName = (session?.user as any)?.businessName || "Business";
+  const userEmail = session?.user?.email || "user@example.com";
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -105,19 +110,19 @@ export default function DashboardLayout({
         <div className="absolute bottom-0 left-0 right-0 border-t bg-card p-4">
           <div className="flex items-center gap-3">
             <Avatar>
-              <AvatarFallback>U</AvatarFallback>
+              <AvatarFallback>{businessName[0]}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium truncate">User Name</p>
-              <p className="text-xs text-muted-foreground truncate">user@example.com</p>
+              <p className="text-sm font-medium truncate">{businessName}</p>
+              <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
             </div>
             <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => signOut({ callbackUrl: "/login" })}
-                >
-                <LogOut className="h-4 w-4" />
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>

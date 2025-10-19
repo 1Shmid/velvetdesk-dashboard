@@ -1,30 +1,64 @@
 import { Phone, Calendar, TrendingUp, Users, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 
-export default function DashboardPage() {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export default async function DashboardPage() {
+  const session = await auth();
+  
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const businessId = (session.user as any).businessId;
+  const businessName = (session.user as any).businessName;
+
+  // Загружаем статистику
+  const [callsData, bookingsData] = await Promise.all([
+    supabase
+      .from("calls")
+      .select("*")
+      .eq("business_id", businessId),
+    supabase
+      .from("bookings")
+      .select("*")
+      .eq("business_id", businessId)
+  ]);
+
+  const totalCalls = callsData.data?.length || 0;
+  const completedCalls = callsData.data?.filter(c => c.status === "completed").length || 0;
+  const successRate = totalCalls > 0 ? Math.round((completedCalls / totalCalls) * 100) : 0;
+  const totalBookings = bookingsData.data?.length || 0;
+
   const stats = [
     {
       name: "Total Calls",
-      value: "0",
+      value: totalCalls.toString(),
       icon: Phone,
       change: "+0%",
     },
     {
       name: "Bookings",
-      value: "0",
+      value: totalBookings.toString(),
       icon: Calendar,
       change: "+0%",
     },
     {
       name: "Success Rate",
-      value: "0%",
+      value: `${successRate}%`,
       icon: TrendingUp,
       change: "+0%",
     },
     {
       name: "Active Clients",
-      value: "0",
+      value: "1",
       icon: Users,
       change: "+0%",
     },
@@ -34,7 +68,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Welcome to VelvetDesk</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome to {businessName}</h1>
         <p className="text-muted-foreground mt-2">
           Here's what's happening with your AI receptionist today.
         </p>
