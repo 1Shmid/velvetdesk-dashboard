@@ -1,0 +1,76 @@
+# SETTINGS PAGE - IMPLEMENTATION PLAN
+
+## 📋 OVERVIEW
+Settings page для управления профилем, уведомлениями, подпиской и аккаунтом.
+
+---
+
+## 🗄️ DATABASE CHANGES
+
+### Update notification_settings table (Phase 1)
+Current structure with boolean fields will be kept for Phase 1.
+Future migration (Phase 2.5): Convert to preferences JSONB column or separate table.
+
+Phase 1 notification types:
+- New Call (email only)
+- Booking Confirmed (email only)
+- Booking Cancelled (email only)  
+- Agent Settings Changed (email only)
+- Billing Updates (email only)
+- Marketing & News (email only)
+
+Phase 2.5 expansion:
+- Add SMS channel (via Twilio)
+- Add WhatsApp channel (via WhatsApp Business API)
+- Add Slack channel (via webhooks)
+- Migrate to JSONB preferences column or notification_preferences table
+```
+
+### Update businesses table:
+- Add: deleted_at TIMESTAMP (for soft delete)
+
+---
+
+## 🎯 PAGE SECTIONS
+
+1. **Profile Settings**
+   - Business name (from businesses)
+   - Contact name (from businesses)
+   - Email (from users)
+   - Change password (hash with bcrypt)
+
+2. **Notifications**
+   - Email notifications (from notification_settings)
+   - SMS toggle (disabled for now)
+
+3. **Subscription & Billing**
+   - Status badge (from businesses.status)
+   - Mock data: €350/month, payment method, next billing
+   - Link to LemonSqueezy portal (Phase 2)
+
+4. **Danger Zone**
+   - Soft delete: UPDATE businesses SET status = 'deleted', deleted_at = NOW()
+
+---
+
+## 🔧 API ENDPOINTS
+
+- GET/PUT /api/profile - profile data
+- PUT /api/password - change password
+- GET/PUT /api/notifications - notification settings
+- DELETE /api/account - soft delete account
+
+---
+
+## ✅ DECISIONS
+
+- Notifications: real DB implementation ✅
+- Subscription: mock data + real UI ✅
+- Delete: soft delete (status = 'deleted') ✅
+- Notifications: Phase 1 = email only (6 types), Phase 2.5 = multi-channel ✅
+- Billing: Phase 1 = mock UI, Phase 2 = LemonSqueezy API integration ✅
+```
+
+
+**Status:** Ready to implement
+**Date:** 20 Oct 2025

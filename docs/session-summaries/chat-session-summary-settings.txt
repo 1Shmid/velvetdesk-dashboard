@@ -1,0 +1,101 @@
+# SETTINGS PAGE - DEVELOPMENT SESSION SUMMARY
+
+## 📅 Date: 20 October 2025
+
+## ✅ COMPLETED
+
+### Database:
+- Created notification_settings table (9 tables total now)
+- Added deleted_at column to businesses table
+- Set up RLS policies for notification_settings
+- Created default notification settings for test business
+
+### API Endpoints:
+- /api/profile (GET/PUT) - profile management ✅
+- /api/password (PUT) - password change with bcrypt ✅
+- /api/notifications (GET/PUT) - notification preferences ✅
+- /api/account (DELETE) - soft delete account ✅
+
+### UI:
+- Settings page created (app/dashboard/settings/page.tsx) ✅
+- Profile Settings section - loads and saves to DB ✅
+- Change Password section - works with validation ✅
+- Notifications section - toggles work, saves to DB ✅
+- Subscription & Billing - mock UI ready ✅
+- Danger Zone - soft delete implemented ✅
+
+---
+
+## 🔄 PHASE 1 SCOPE (CURRENT)
+
+### Notifications:
+- **6 notification types:**
+  - New Call
+  - Booking Confirmed
+  - Booking Cancelled
+  - Agent Settings Changed
+  - Billing Updates
+  - Marketing & News
+- **Channel:** Email only (boolean toggles)
+- **Structure:** Current table with boolean columns
+- **SMS toggle:** Disabled with "Coming Soon" label
+
+### Billing:
+- **Mock data:**
+  - Plan: Pro Plan
+  - Price: €350/month
+  - Status: Active (from businesses.status)
+  - Next billing: hardcoded date
+  - Payment method: •••• 1234 (hardcoded)
+- **Buttons:** "Manage Subscription" disabled (Phase 2)
+- **Invoices:** Empty section (Phase 2)
+
+---
+
+## 🚀 FUTURE PHASES
+
+### Phase 2 (After Payment Integration):
+- LemonSqueezy Customer Portal link (working)
+- Real subscription data from API
+- Invoice list with download links
+- Payment method update (redirect to LemonSqueezy)
+
+### Phase 2.5 (Admin Panel Extended):
+- Multi-channel notifications:
+  - SMS (via Twilio)
+  - WhatsApp (via WhatsApp Business API)
+  - Slack (via webhooks)
+- Migrate notifications to JSONB or separate table
+- Advanced notification rules (time-based, conditional)
+
+---
+
+## 📊 TESTING
+
+**Test Account:**
+- Email: maria@beautysalon.com
+- Password: test123
+
+**Verified:**
+- ✅ Profile loads from businesses + users tables
+- ✅ Profile saves (business_name, contact_name, phone)
+- ✅ Email field disabled (cannot change)
+- ✅ Password change validates current password
+- ✅ Password hash updated in DB (bcrypt)
+- ✅ Notifications load from notification_settings
+- ✅ Notifications save to DB on toggle
+- ✅ Subscription shows mock data
+- ✅ Delete account sets status='deleted' + timestamp
+
+---
+
+## 🎯 NEXT STEPS
+
+1. Finish Settings page (if needed)
+2. Move to Analytics page
+3. Then Bookings page
+4. Complete Phase 1 Customer Dashboard
+
+**Status:** Settings page 90% complete (Phase 1 scope)
+**Remaining:** Fine-tuning, edge cases, validation improvements
+```
