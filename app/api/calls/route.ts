@@ -7,28 +7,43 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET() {
-  try {
-    const session = await auth();
+export async function GET(request: Request) {
+  const session = await auth();
+  
+  if (!session?.user?.businessId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const { searchParams } = new URL(request.url);
+  const callId = searchParams.get('id');
 
-    const businessId = (session.user as any).businessId;
-
-    const { data: calls, error } = await supabase
-      .from("calls")
-      .select("*")
-      .eq("business_id", businessId)
-      .order("call_date", { ascending: false });
+  // Single call by ID
+  if (callId) {
+    const { data: call, error } = await supabase
+      .from('calls')
+      .select('*')
+      .eq('id', callId)
+      .eq('business_id', session.user.businessId)
+      .single(); // ← это должно вернуть один объект
 
     if (error) {
+      console.error('Call fetch error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(calls);
-  } catch (error) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(call); // ← возвращаем объект, не массив
   }
+
+  // All calls (массив)
+  const { data: calls, error } = await supabase
+    .from('calls')
+    .select('*')
+    .eq('business_id', session.user.businessId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(calls);
 }
