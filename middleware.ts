@@ -3,20 +3,36 @@ import { NextResponse } from "next/server";
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isOnDashboard = req.nextUrl.pathname.startsWith("/dashboard");
-  const isOnLogin = req.nextUrl.pathname === "/login";
+  const userRole = req.auth?.user?.role;
+  const pathname = req.nextUrl.pathname;
 
-  if (!isLoggedIn && isOnDashboard) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  // /admin-login - публичная страница
+  if (pathname === "/admin-login") {
+    return NextResponse.next();
   }
 
-  if (isLoggedIn && isOnLogin) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  // Если залогинен и пытается зайти на login
+  if (isLoggedIn && pathname === "/login") {
+    const redirectUrl = userRole === "super_admin" ? "/admin" : "/dashboard";
+    return NextResponse.redirect(new URL(redirectUrl, req.url));
+  }
+
+  // Защита /admin/* 
+  if (pathname.startsWith("/admin")) {
+    const adminCookie = req.cookies.get("admin_id");
+    if (!adminCookie) {
+      return NextResponse.redirect(new URL("/admin-login", req.url));
+    }
+  }
+
+  // Защита /dashboard/*
+  if (pathname.startsWith("/dashboard") && !isLoggedIn) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/admin-login"],
 };

@@ -35,16 +35,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             .eq("email", email)
             .single();
 
-          console.log("User from DB:", user);
-          console.log("DB Error:", error);
-
           if (error || !user) {
-            console.log("User not found or error");
             return null;
           }
 
           if (!user.is_active) {
-            console.log("User not active");
             return null;
           }
 
@@ -52,8 +47,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials.password as string,
             user.password_hash
           );
-
-          console.log("Password valid:", isValid);
 
           if (!isValid) {
             return null;
