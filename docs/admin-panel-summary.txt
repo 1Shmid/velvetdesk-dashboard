@@ -1,0 +1,126 @@
+# ADMIN PANEL SUMMARY
+
+## 📊 OVERVIEW
+
+Admin Panel - управление VelvetDesk платформой для super_admin.
+Доступ: http://localhost:3000/admin-login (production: https://velvetdesk.ai/admin-login)
+
+## 🔐 AUTHENTICATION
+
+**Separate auth system от customer dashboard:**
+- Login: /admin-login (отдельная страница, темная тема)
+- Auth: Cookie-based (admin_id cookie, не NextAuth)
+- Logout: удаляет cookie, редирект на /admin-login
+- Middleware: проверяет admin_id cookie для /admin/* routes
+
+**Test credentials:**
+- Email: admin@velvetdesk.ai
+- Password: admin123
+
+## 📁 STRUCTURE
+```
+/admin-login          → Admin login page (dark theme)
+/admin                → Dashboard (overview)
+/admin/customers      → All businesses list
+/admin/customers/[id] → Customer detail page
+/admin/waitlist       → Waitlist management (approve/reject)
+/admin/revenue        → MRR, ARR, breakdown
+/admin/product-usage  → Calls statistics
+```
+
+## 🎯 FEATURES (Phase 1.5)
+
+### 1. Dashboard (Home)
+- MRR (Monthly Recurring Revenue)
+- Active subscriptions count
+- Total calls across platform
+- Key metrics overview
+
+### 2. Customers
+**List view:**
+- All businesses from `businesses` table
+- Columns: Business, Email, Phone, Status, Created, Actions
+- Status badges: active/pending_payment/past_due/suspended/cancelled
+- "View" button → customer detail page
+
+**Detail view (/customers/[id]):**
+- Business info (name, email, phone, VAPI ID)
+- Total calls count
+- Recent 10 calls table
+- Back to list navigation
+
+### 3. Waitlist
+**Stats cards:**
+- Pending Approval (status: email_verified)
+- Approved (moved to onboarding)
+- Rejected
+
+**Table:**
+- Columns: Business Name, Type, Contact, Phone, Email, Verified (icon), Created, Status, Actions
+- Actions: Approve/Reject buttons (только для email_verified)
+- После Approve: статус → "approved", исчезает из pending
+
+**Approve flow:**
+1. Admin clicks Approve
+2. Status в waitlist → "approved"
+3. TODO: создать запись в businesses (status: pending_payment)
+4. TODO: отправить payment invite email (€50 LemonSqueezy link)
+
+### 4. Revenue
+**Stats:**
+- MRR = active customers × €350
+- Total Revenue (Year 1) = setup fees + 12 months MRR
+- Active Customers count
+
+**Breakdown:**
+- Setup Fees (€50 × customers)
+- Monthly Recurring (€350 × customers)
+- Annual Recurring Revenue (ARR)
+
+### 5. Product Usage
+**Stats:**
+- Total Calls across platform
+- Avg Call Duration
+- Success Rate (completed / total)
+- Active Businesses (with calls)
+
+**Table: Calls by Customer**
+- Business name
+- Total calls
+- Total duration (minutes)
+- Avg duration per call
+- Sorted by call count DESC
+
+## 🗄️ DATABASE
+
+**Tables used:**
+- `users` (admin login: role = super_admin, business_id = NULL)
+- `businesses` (all customers)
+- `calls` (all calls, grouped by business_id)
+- `waitlist` (applications: pending/email_verified/approved/rejected)
+
+**RLS:** Admin bypasses RLS через SERVICE_ROLE_KEY
+
+## 🔧 TECH STACK
+
+- Next.js 15 App Router (server components)
+- Supabase (SERVICE_ROLE_KEY for admin queries)
+- Cookie-based auth (admin_id)
+- TailwindCSS + Lucide icons
+- Dark sidebar theme (gray-900)
+
+## 📝 TODO (Phase 2.5)
+
+- [ ] Approve → auto-create business + send payment email
+- [ ] MRR chart (monthly growth)
+- [ ] Failed payments handling
+- [ ] Usage monitoring (call minutes limits)
+- [ ] "Login as customer" feature
+- [ ] Email notification settings
+- [ ] Invoice generation
+- [ ] Export data to CSV
+
+---
+
+**Status:** Phase 1.5 Complete ✅  
+**Last Update:** 21 октября 2025
