@@ -2,12 +2,20 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
-import { LayoutDashboard, Users, Clock, BarChart3, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Clock, DollarSign, BarChart3, LogOut } from "lucide-react";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const navigation = [
+  { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { name: "Customers", href: "/admin/customers", icon: Users },
+  { name: "Waitlist", href: "/admin/waitlist", icon: Clock },
+  { name: "Revenue", href: "/admin/revenue", icon: DollarSign },
+  { name: "Product Usage", href: "/admin/product-usage", icon: BarChart3 },
+];
 
 export default async function AdminLayout({
   children,
@@ -21,7 +29,6 @@ export default async function AdminLayout({
     redirect("/admin-login");
   }
 
-  // Получаем данные админа
   const { data: admin } = await supabase
     .from("users")
     .select("email")
@@ -41,31 +48,25 @@ export default async function AdminLayout({
         <h1 className="text-2xl font-bold mb-8">VelvetDesk Admin</h1>
         
         <nav className="space-y-2 flex-1">
-          <Link href="/admin" className="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-800">
-            <LayoutDashboard size={20} />
-            Dashboard
-          </Link>
-          
-          <Link href="/admin/customers" className="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-800">
-            <Users size={20} />
-            Customers
-          </Link>
-          
-          <Link href="/admin/waitlist" className="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-800">
-            <Clock size={20} />
-            Waitlist
-          </Link>
-          
-          <Link href="/admin/stats" className="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-800">
-            <BarChart3 size={20} />
-            Statistics
-          </Link>
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+              >
+                <Icon size={20} />
+                {item.name}
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="mt-auto">
-          <p className="text-sm text-gray-400 mb-2">{admin?.email}</p>
+        <div className="mt-auto pt-4 border-t border-gray-800">
+          <p className="text-sm text-gray-400 mb-3">{admin?.email}</p>
           <form action={handleLogout}>
-            <button type="submit" className="flex items-center gap-2 text-red-400 hover:text-red-300">
+            <button type="submit" className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors">
               <LogOut size={16} />
               Logout
             </button>
