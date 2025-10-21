@@ -50,3 +50,8 @@ credentials.json
 # Temporary docs (optional)
 docs/temp/
 *.draft.md
+
+.env.local
+.env*.local
+node_modules/
+.next/
