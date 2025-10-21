@@ -1,7 +1,250 @@
-1. Onboarding Flow (automated setup)
-2. Operator Handoff (human escalation)
-3. Scaling Strategy (0→10→50→100 clients)
-4. Risk Mitigation (SoF pack, payment freeze)
-5. Cost Breakdown (Supabase, VAPI, Twilio)
-6. SWOT Analysis
-7. Next Steps Timeline
+# ONBOARDING & OPERATIONS PLAN
+
+## 🎯 AUTOMATED ONBOARDING FLOW
+
+### Phase 1: Waitlist → Payment (Customer Journey)
+
+**Step 1: Landing Form**
+- Собираем: business_name, contact_name, email
+- Собираем: contact_phone (личный), business_phone (куда AI), telecom_operator
+- Отправляем verification email
+
+**Step 2: Email Verified**
+- Status в waitlist: email_verified
+- Ждёт admin approval
+
+**Step 3: Admin Approve (/admin/waitlist)**
+- Admin clicks "Approve"
+- Создаётся business (status: pending_payment)
+- Отправляется payment invite: "Pay €50 to activate"
+
+**Step 4: Payment (LemonSqueezy)**
+- Customer pays €50
+- Webhook → business (status: active)
+- Magic link email: "Set your password"
+
+**Step 5: First Login**
+- Welcome tour (tooltips)
+- Setup wizard: hours, services, agent settings
+- Auto-create VAPI assistant
+- Display business phone + forwarding instructions
+
+### Phase 2: AI Agent Setup (Dashboard Wizard)
+
+**Customer fills:**
+1. Business hours (working_hours table)
+2. Services menu + prices (services table)  
+3. Agent personality (name, gender, tone)
+4. Custom instructions (special requests, policies)
+
+**System automatically:**
+1. POST /api/vapi/assistant → create assistant
+2. Save vapi_assistant_id в businesses
+3. Generate forwarding guide (PDF) based on telecom_operator
+4. Email: "Your AI is ready! Forward calls to [business_phone]"
+
+**No manual work!** ✅
+
+---
+
+## 👔 OPERATOR HANDOFF STRATEGY
+
+### When to Transfer to Human
+
+**Triggers:**
+1. Customer explicitly asks: "хочу менеджера", "real person"
+2. AI confidence < 70% (uncertain answer)
+3. Complaint or refund request
+4. Complex booking modification
+
+### Transfer Methods
+
+**Method A: Direct Call Transfer (VAPI feature)**
+- AI says: "Connecting you to our manager..."
+- VAPI transfers to business.contact_phone
+- Works 0-10 clients (low volume)
+
+**Method B: Ticket + Callback**
+- AI: "Manager will call you back in 10 minutes"
+- Create support_tickets record (customer_name, phone, issue)
+- Email business owner: "Urgent callback needed"
+- Works 10-50 clients
+
+**Method C: Support Dashboard (50+ clients)**
+- Dedicated support operator pool
+- /dashboard/support-tickets
+- SLA: 10 min response time
+
+### Norms & Procedures
+
+**Response Times:**
+- Urgent (complaint): 10 min callback
+- Standard (question): 30 min
+- Low priority: 2 hours
+
+**Business Hours Only:**
+- Outside hours: "We're closed, call back Mon-Fri 9-18"
+- Emergency line: business owner decides (optional)
+
+**Quality Checks:**
+- Random call review (10% sample)
+- Customer satisfaction survey after handoff
+- AI learns from human operator responses
+
+---
+
+## 📞 TELECOM INTEGRATION
+
+### Call Forwarding Setup
+
+**Data collected:**
+- business_phone: номер клиента куда звонят customers
+- telecom_operator: Movistar / Vodafone / Orange / Yoigo / etc
+
+**Auto-generate guide (PDF):**
+
+**Movistar:**
+```
+1. Dial *21*[AI_NUMBER]#
+2. Press Call
+3. Confirm "Forwarding activated"
+```
+
+**Vodafone:**
+```
+1. Settings → Call Forwarding
+2. Enter [AI_NUMBER]
+3. Save
+```
+
+**Email after setup:**
+Subject: "Your AI Receptionist is Ready!"
+- Attached: forwarding_guide_[operator].pdf
+- Link to video tutorial (YouTube)
+- Support: support@velvetdesk.ai
+
+---
+
+## 💰 COST BREAKDOWN (per customer)
+
+**Fixed Costs (VelvetDesk):**
+- Supabase: $0.05/customer/month
+- Vercel: $0.02/customer/month
+
+**Variable Costs (per customer):**
+- VAPI: ~€30-50/month (based on call volume)
+- Twilio phone: €1/month (optional, if we provide number)
+
+**Revenue:**
+- Setup: €50 (one-time)
+- Recurring: €350/month
+
+**Margin:** ~85% after VAPI costs
+
+**Break-even:** 1 customer = profitable
+
+---
+
+## 🚨 RISK MITIGATION
+
+### 1. Payment Processor Freeze
+**Risk:** Payoneer/Wise замораживает при $5k+
+**Solution:**
+- Prepare SoF pack (Source of Funds): invoices, contracts, explainer PDF
+- Gradual scaling (10 → 50 → 100 customers)
+- Multiple accounts (Wise + Paysera backup)
+
+### 2. VAPI Downtime
+**Risk:** VAPI API unavailable
+**Solution:**
+- Health check every 5 min
+- Fallback: Twilio direct (basic IVR menu)
+- Email alerts to admin
+
+### 3. Customer Complaints
+**Risk:** AI не справляется, клиент требует refund
+**Solution:**
+- 7-day money-back guarantee (€50 setup fee)
+- Recurring €350 - cancel anytime (no refund for current month)
+- Human handoff within 10 min
+
+### 4. Scaling Issues
+**Risk:** Too many customers, manual work grows
+**Solution:**
+- Automate onboarding 100%
+- Self-serve dashboard (no support calls)
+- Hire VA (Virtual Assistant) at 100+ customers
+
+---
+
+## 📈 SCALING STRATEGY
+
+### 0-10 Customers (Manual OK)
+- Admin approves waitlist manually
+- Direct call transfer to owner phone
+- Personal email support
+
+### 10-50 Customers (Semi-automated)
+- Auto-approve waitlist (if email verified)
+- Ticket system (no direct transfer)
+- FAQ + chatbot support
+
+### 50-100 Customers (Fully automated)
+- Zero manual intervention
+- Support dashboard with SLA tracking
+- Video tutorials + knowledge base
+
+### 100+ Customers (Team)
+- Hire support operator (€1,500/mo)
+- Dedicated account manager for high-value clients (€500+/mo plans)
+- Multi-language support (EN/ES/FR)
+
+---
+
+## 🎯 SWOT ANALYSIS
+
+**Strengths:**
+- Simple setup (5 min onboarding)
+- High-quality AI voice (VAPI)
+- GDPR compliant (EU data centers)
+- Multi-language (EN/ES out of box)
+
+**Weaknesses:**
+- Dependency on VAPI (single provider)
+- No brand recognition (new market)
+- Limited integrations (only Google Cal)
+
+**Opportunities:**
+- EU market underserved (US-focused competitors)
+- SMB segment (salons, clinics, restaurants)
+- White-label for agencies
+
+**Threats:**
+- Competitors: Bland.ai, Air.ai, Synthflow
+- AI costs may increase (GPT pricing)
+- Regulation (AI call disclosure laws)
+
+---
+
+## ⏰ TIMELINE (Next 2 Weeks)
+
+**Week 1: MVP Launch**
+- Day 1-2: VAPI integration + webhook
+- Day 3-4: LemonSqueezy payment + onboarding flow
+- Day 5: Test end-to-end (waitlist → payment → dashboard)
+- Day 6-7: First 3-5 pilot customers
+
+**Week 2: Marketing Push**
+- Day 8-9: Meta Ads + Google Ads setup
+- Day 10-12: Monitor conversions, optimize ads
+- Day 13-14: Reach 10 paying customers
+
+**Week 3: Scale**
+- Apply for Wise Business (need €3,500+ revenue proof)
+- Optimize onboarding based on feedback
+- Goal: 20 customers by end of month
+
+---
+
+**Status:** Ready for implementation  
+**Last Update:** 21 октября 2025
