@@ -1,0 +1,7 @@
+1. Onboarding Flow (automated setup)
+2. Operator Handoff (human escalation)
+3. Scaling Strategy (0→10→50→100 clients)
+4. Risk Mitigation (SoF pack, payment freeze)
+5. Cost Breakdown (Supabase, VAPI, Twilio)
+6. SWOT Analysis
+7. Next Steps Timeline
