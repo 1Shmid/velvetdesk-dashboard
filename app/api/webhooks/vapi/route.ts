@@ -14,8 +14,8 @@ export async function POST(request: Request) {
 
     // VAPI отправляет status-update с ended
     const isCallEnded = 
-      payload.message?.type === 'status-update' && 
-      payload.message?.status === 'ended';
+    payload.message?.type === 'end-of-call-report' ||
+    (payload.message?.type === 'status-update' && payload.message?.status === 'ended');
 
     if (!isCallEnded) {
       return NextResponse.json({ received: true });
@@ -40,38 +40,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 });
     }
 
-    // Собираем transcript из messages
-    const messages = artifact.messages || [];
-    const transcriptParts = messages
-      .filter((m: any) => m.role === 'bot' || m.role === 'user')
-      .map((m: any) => {
-        const speaker = m.role === 'bot' ? 'AI' : 'Customer';
-        return `${speaker}: ${m.message}`;
-      });
-    const transcript = transcriptParts.join('\n\n');
+    // Используем готовые данные из payload
+    const transcript = payload.message.transcript || '';
+    const summary = payload.message.summary || '';
+    const duration = Math.round(payload.message.durationSeconds || 0);
+    const recordingUrl = payload.message.recordingUrl || '';
 
-    // Вычисляем duration из первого и последнего сообщения
-    const firstMsg = messages.find((m: any) => m.time);
-    const lastMsg = [...messages].reverse().find((m: any) => m.time);
-    const duration = firstMsg && lastMsg 
-      ? Math.round((lastMsg.time - firstMsg.time) / 1000) 
-      : 0;
-
-    // Пытаемся найти имя клиента в transcript
+    // Парсим имя из transcript (ищем после "Sofía" или другое имя)
     let customerName = 'Unknown';
-    const namePatterns = [
-      /nombre.*?([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i,
-      /llamo\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i,
-      /soy\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i
-    ];
-    
-    for (const pattern of namePatterns) {
-      const match = transcript.match(pattern);
-      if (match && match[1]) {
-        customerName = match[1];
+    const messages = artifact?.messages || [];
+    for (const msg of messages) {
+    if (msg.role === 'user' && msg.message) {
+        // Простая проверка: если сообщение короткое и начинается с заглавной - это имя
+        const trimmed = msg.message.trim();
+        if (trimmed.length < 20 && /^[A-ZÁÉÍÓÚÑ]/.test(trimmed) && !trimmed.includes(' ')) {
+        customerName = trimmed.replace(/[.,;]$/, '');
         break;
-      }
+        }
     }
+    }
+        
+    
 
     // Сохраняем в Supabase
     const { data: savedCall, error: callError } = await supabase
@@ -83,8 +72,9 @@ export async function POST(request: Request) {
         phone: call.customer?.number || '',
         duration: duration,
         status: 'completed',
+        summary: summary,
         transcript: transcript,
-        recording_url: '', // TODO: VAPI может отправить позже
+        recording_url: recordingUrl,
         call_date: new Date().toISOString()
       })
       .select()
