@@ -12,14 +12,11 @@ export async function POST(request: Request) {
     
     console.log('VAPI Webhook received:', JSON.stringify(payload, null, 2));
 
-    // VAPI отправляет status-update с ended
-    const isCallEnded = 
-    payload.message?.type === 'end-of-call-report' ||
-    (payload.message?.type === 'status-update' && payload.message?.status === 'ended');
-
-    if (!isCallEnded) {
-      return NextResponse.json({ received: true });
+    // Обрабатываем ТОЛЬКО end-of-call-report
+    if (payload.message?.type !== 'end-of-call-report') {
+        return NextResponse.json({ received: true });
     }
+
 
     const call = payload.message?.call;
     const artifact = payload.message?.artifact;
