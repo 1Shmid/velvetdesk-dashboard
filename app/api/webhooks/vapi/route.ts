@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         business_id: business.id,
         vapi_call_id: call.id,
         customer_name: call.customer?.name || 'Unknown',
-        customer_phone: call.customer?.number || '',
+        phone: call.customer?.number || '',
         duration_seconds: durationSeconds,
         status: call.status === 'ended' ? 'completed' : call.status,
         transcript: call.transcript || '',
