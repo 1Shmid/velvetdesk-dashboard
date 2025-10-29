@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     // Вычисляем длительность звонка
     const startedAt = new Date(call.startedAt);
     const endedAt = new Date(call.endedAt);
-    const durationSeconds = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
+    const duration = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
 
     // Сохраняем звонок в таблицу calls
     const { data: savedCall, error: callError } = await supabase
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         vapi_call_id: call.id,
         customer_name: call.customer?.name || 'Unknown',
         phone: call.customer?.number || '',
-        duration_seconds: durationSeconds,
+        duration: duration,
         status: call.status === 'ended' ? 'completed' : call.status,
         transcript: call.transcript || '',
         recording_url: call.recordingUrl || '',
