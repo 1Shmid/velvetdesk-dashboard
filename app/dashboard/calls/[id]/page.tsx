@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Share2, Clock, Calendar, User, ChevronDown, ChevronUp, Check, Phone } from "lucide-react";
+import { ArrowLeft, Clock, Calendar, User, ChevronDown, ChevronUp, Check, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,19 +12,17 @@ import { useToast } from "@/hooks/use-toast";
 
 // Утилиты для парсинга
   const parseBookingPhone = (transcript: string): string | null => {
-    // Разбиваем transcript на строки
-    const lines = transcript.split('\n').reverse(); // С конца
+    // Берём последние 3-4 строки (где подтверждение)
+    const lines = transcript.split('\n').slice(-4);
     
-    // Ищем подтверждение номера в последних строках
     for (const line of lines) {
-      // Паттерн: "Tu número es 6 5 5 3 3 8 8 4 3" или "655 338 843"
-      const match = line.match(/(\d[\s\d]{8,})/);
-      if (match) {
-        const phone = match[1].replace(/\s/g, '');
-        // Проверяем что это похоже на телефон (9+ цифр)
-        if (phone.length >= 9) {
-          return phone;
-        }
+      // Извлекаем все цифры из строки
+      const digits = line.replace(/\D/g, '');
+      
+      // Ищем последовательность из 9-10 цифр
+      if (digits.length >= 9) {
+        // Берём последние 9 цифр (испанский номер без +34)
+        return digits.slice(-9);
       }
     }
     return null;
@@ -231,22 +229,6 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
     );
     }
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast({
-        title: "Link copied!",
-        description: "Call link copied to clipboard",
-      });
-    } catch (err) {
-      toast({
-        title: "Failed to copy",
-        description: "Please copy the URL manually",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleSaveInstruction = () => {
     if (!instruction.trim()) return;
@@ -270,7 +252,6 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
         <Button
           variant="ghost"
           onClick={() => router.push("/dashboard/calls")}
@@ -279,11 +260,6 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back to Calls</span>
         </Button>
-        <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
-          <Share2 className="h-4 w-4" />
-          Share
-        </Button>
-      </div>
 
       {/* Call Info Card */}
       <Card>
