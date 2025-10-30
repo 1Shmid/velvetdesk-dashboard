@@ -12,19 +12,41 @@ import { useToast } from "@/hooks/use-toast";
 
 // Утилиты для парсинга
   const parseBookingPhone = (transcript: string): string | null => {
-    // Берём последние 3-4 строки (где подтверждение)
-    const lines = transcript.split('\n').slice(-4);
+    // Паттерны для разных языков: español, english, русский
+    const phonePatterns = [
+      /n[úu]mero/i,  // número, numero (ES)
+      /number/i,      // number (EN)
+      /номер/i        // номер (RU)
+    ];
     
-    for (const line of lines) {
-      // Извлекаем все цифры из строки
-      const digits = line.replace(/\D/g, '');
+    const lines = transcript.split('\n');
+    
+    // Ищем строку с ключевым словом "номер/número/number"
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
       
-      // Ищем последовательность из 9-10 цифр
-      if (digits.length >= 9) {
-        // Берём последние 9 цифр (испанский номер без +34)
+      for (const pattern of phonePatterns) {
+        if (pattern.test(line)) {
+          // Извлекаем текст после ключевого слова
+          const afterKeyword = line.split(pattern)[1] || '';
+          const digits = afterKeyword.replace(/\D/g, '');
+          
+          // Если нашли 9+ цифр, берём последние 9
+          if (digits.length >= 9) {
+            return digits.slice(-9);
+          }
+        }
+      }
+    }
+    
+    // Fallback: ищем любую строку с 9-12 цифрами в последних 5 строках
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
+      const digits = lines[i].replace(/\D/g, '');
+      if (digits.length >= 9 && digits.length <= 12) {
         return digits.slice(-9);
       }
     }
+    
     return null;
   };
 
