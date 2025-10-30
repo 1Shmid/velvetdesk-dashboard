@@ -253,39 +253,43 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
       {/* Call Info Card */}
       <Card>
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold">{call.customerName}</p>
-                <p className="text-sm text-muted-foreground">{call.phone}</p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+              <User className="h-5 w-5 text-primary" />
             </div>
-
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="font-semibold">{new Date(call.call_date).toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Date & Time</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="font-semibold">{Math.floor(call.duration / 60)}:{(call.duration % 60).toString().padStart(2, '0')}</p>
-                <Badge className={
-                  call.status === "completed" 
-                    ? "bg-green-100 text-green-800 ml-2" 
-                    : "bg-red-100 text-red-800 ml-2"
-                }>
-                  {call.status}
-                </Badge>
-              </div>
+            <div>
+              <p className="font-semibold">{call.customer_name}</p>
+              <p className="text-sm text-muted-foreground">{call.phone}</p>
             </div>
           </div>
+
+          <div className="flex items-center gap-3">
+            <Calendar className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm text-muted-foreground">Date & Time</p>
+              <p className="font-semibold">
+                {new Date(call.call_date).toLocaleString('en-GB', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 mt-4">
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-muted-foreground" />
+            <span className="font-semibold">{Math.floor(call.duration / 60)}:{(call.duration % 60).toString().padStart(2, '0')}</span>
+          </div>
+          <Badge className={call.status === "completed" ? "bg-green-500" : "bg-red-500"}>
+            {call.status.charAt(0).toUpperCase() + call.status.slice(1)}
+          </Badge>
+        </div>
         </CardContent>
       </Card>
 
@@ -433,7 +437,7 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
         <CardContent className="space-y-2">
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <p className="text-sm">
-              <strong>Outcome:</strong> Booking confirmed for Friday at 17:00
+              <strong>Outcome:</strong> Booking confirmed{call.summary ? `: ${call.summary.split('appointment')[1]?.split('.')[0] || ''}` : ''}
             </p>
             <p className="text-sm">
               <strong>Action Items:</strong> Send SMS reminder on Thursday

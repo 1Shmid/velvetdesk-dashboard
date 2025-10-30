@@ -237,7 +237,6 @@ export default function CallsPage() {
                   <th className="text-left py-3 px-4">Booking Phone</th>
                   <th className="text-left py-3 px-4">Status</th>
                   <th className="text-left py-3 px-4">Date & Time</th>
-                  <th className="text-left py-3 px-4">Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -272,14 +271,7 @@ export default function CallsPage() {
                     </td>
                     <td className="py-4 px-4 text-sm text-muted-foreground">
                       {formatDate(call.call_date)}
-                    </td>
-                    <td className="py-4 px-4">
-                      <Link href={`/dashboard/calls/${call.id}`}>
-                        <Button variant="ghost" size="sm">
-                          Transcript
-                        </Button>
-                      </Link>
-                    </td>
+                    </td>                    
                   </tr>
                 ))}
               </tbody>
@@ -322,11 +314,6 @@ export default function CallsPage() {
                         {formatDate(call.call_date)}
                       </span>
                     </div>
-                    <Link href={`/dashboard/calls/${call.id}`}>
-                      <Button variant="outline" size="sm" className="w-full mt-2">
-                        View Transcript
-                      </Button>
-                    </Link>
                   </div>
                 </CardContent>
               </Card>
