@@ -10,6 +10,36 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
+// Утилиты для парсинга
+  const parseBookingPhone = (transcript: string): string | null => {
+    // Ищем паттерны подтверждения номера
+    const patterns = [
+      /número.*?(\d[\s\d]{8,})/i,
+      /teléfono.*?(\d[\s\d]{8,})/i,
+      /phone.*?(\d[\s\d]{8,})/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = transcript.match(pattern);
+      if (match) {
+        return match[1].replace(/\s/g, '');
+      }
+    }
+    return null;
+  };
+
+  const parseService = (transcript: string): string | null => {
+    const services = ['manicura', 'pedicura', 'corte', 'tinte', 'haircut', 'coloring'];
+    const lower = transcript.toLowerCase();
+    
+    for (const service of services) {
+      if (lower.includes(service)) {
+        return service.charAt(0).toUpperCase() + service.slice(1);
+      }
+    }
+    return null;
+  };
+
 // Типы
 type CallStatus = "completed" | "missed" | "in-progress";
 
@@ -165,6 +195,9 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
       .catch(() => setLoading(false));
   }, [resolvedParams.id]);
 
+  const bookingPhone = call?.transcript ? parseBookingPhone(call.transcript) : null;
+  const service = call?.transcript ? parseService(call.transcript) : null;
+
   if (loading) {
     return <div className="p-8">Loading...</div>;
   }
@@ -261,6 +294,9 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
             <div>
               <p className="font-semibold">{call.customer_name}</p>
               <p className="text-sm text-muted-foreground">{call.phone}</p>
+              {bookingPhone && bookingPhone !== call.phone && (
+                <p className="text-xs text-muted-foreground">Booking: {bookingPhone}</p>
+              )}
             </div>
           </div>
 
@@ -437,7 +473,7 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
         <CardContent className="space-y-2">
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <p className="text-sm">
-              <strong>Outcome:</strong> Booking confirmed{call.summary ? `: ${call.summary.split('appointment')[1]?.split('.')[0] || ''}` : ''}
+              <strong>Outcome:</strong> Booking confirmed{service ? ` for ${service}` : ''}{call.summary ? `, ${call.summary.split('for ')[1]?.split('.')[0] || ''}` : ''}
             </p>
             <p className="text-sm">
               <strong>Action Items:</strong> Send SMS reminder on Thursday

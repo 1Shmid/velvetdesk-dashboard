@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Phone, Calendar, Search } from "lucide-react";
+import { Phone, Calendar, Search, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -279,46 +279,41 @@ export default function CallsPage() {
           </div>
 
           {/* Mobile Cards */}
-          <div className="md:hidden space-y-4">
-            {filteredCalls.map((call) => (
-              <Card 
-                key={call.id}
-                className="cursor-pointer"
-                onClick={() => router.push(`/dashboard/calls/${call.id}`)}
-              >
-                <CardContent className="pt-6">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">{call.customer_name || "Unknown"}</p>
+            <div className="md:hidden space-y-4">
+              {filteredCalls.map((call) => (
+                <Card 
+                  key={call.id}
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => router.push(`/dashboard/calls/${call.id}`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-base">{call.customer_name || "Unknown"}</h3>
+                        <p className="text-sm text-muted-foreground">{call.phone}</p>
+                      </div>
                       <Badge
-                        variant={
-                          call.status === "completed"
-                            ? "default"
-                            : call.status === "missed"
-                            ? "destructive"
-                            : "secondary"
-                        }
-                        className={
-                          call.status === "completed"
-                            ? "bg-green-500 hover:bg-green-600"
-                            : ""
-                        }
+                        variant={call.status === "completed" ? "default" : "destructive"}
+                        className={call.status === "completed" ? "bg-green-500 hover:bg-green-600" : ""}
                       >
                         {call.status.charAt(0).toUpperCase() + call.status.slice(1)}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">{call.phone}</p>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{formatDuration(call.duration)}</span>
-                      <span className="text-muted-foreground">
-                        {formatDate(call.call_date)}
-                      </span>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>{formatDuration(call.duration)}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        <span>{formatDate(call.call_date).split(',')[0]}</span>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
           {filteredCalls.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
