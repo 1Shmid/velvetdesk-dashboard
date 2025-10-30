@@ -1,6 +1,9 @@
-import { auth, signOut } from "@/lib/auth";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { 
   LayoutDashboard, 
   Phone, 
@@ -8,8 +11,12 @@ import {
   BarChart3, 
   Bot,
   Calendar,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -20,67 +27,144 @@ const navigation = [
   { name: "Bookings", href: "/dashboard/bookings", icon: Calendar },
 ];
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  const businessName = (session.user as any)?.businessName || "Business";
-  const userEmail = session.user?.email || "user@example.com";
-
-  async function handleLogout() {
-    "use server";
-    await signOut({ redirectTo: "/login" });
-  }
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r flex flex-col">
-        <div className="h-14 flex items-center border-b px-6">
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Logo */}
+        <div className="h-14 flex items-center justify-between border-b px-6">
           <h1 className="text-xl font-bold text-primary">VelvetDesk</h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
-        <nav className="flex flex-col gap-1 p-4 flex-1">
+        {/* Navigation */}
+        <nav className="flex flex-col gap-1 p-4">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const isActive = pathname === item.href;
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-gray-100"
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-2 rounded-lg transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
               >
                 <Icon className="h-5 w-5" />
-                {item.name}
+                <span>{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t p-4">
+        {/* User Section */}
+        <div className="absolute bottom-0 left-0 right-0 border-t bg-card p-4">
           <div className="mb-2">
-            <p className="text-sm font-medium">{businessName}</p>
-            <p className="text-xs text-gray-500">{userEmail}</p>
+            <p className="text-sm font-medium">Beauty Salon Madrid 666</p>
+            <p className="text-xs text-muted-foreground">maria1@beautysalon.com</p>
           </div>
-          <form action={handleLogout}>
-            <button type="submit" className="flex items-center gap-2 text-red-600 text-sm">
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-          </form>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-red-600"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile Header */}
+        <header className="lg:hidden sticky top-0 z-30 h-14 flex items-center justify-between border-b bg-background/95 backdrop-blur px-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h2 className="text-lg font-semibold">VelvetDesk</h2>
+          <div className="w-10" />
+        </header>
+
+        {/* Desktop Header */}
+        <header className="hidden lg:flex sticky top-0 z-30 h-14 items-center justify-between border-b bg-background/95 backdrop-blur px-6">
+          <h2 className="text-xl font-semibold">Dashboard</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8">
+          {children}
+        </main>
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t bg-card">
+        <div className="grid grid-cols-5 gap-1 p-2">
+          {navigation.slice(0, 5).map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-xs transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px]">{item.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

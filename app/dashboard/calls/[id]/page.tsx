@@ -12,17 +12,19 @@ import { useToast } from "@/hooks/use-toast";
 
 // Утилиты для парсинга
   const parseBookingPhone = (transcript: string): string | null => {
-    // Ищем паттерны подтверждения номера
-    const patterns = [
-      /número.*?(\d[\s\d]{8,})/i,
-      /teléfono.*?(\d[\s\d]{8,})/i,
-      /phone.*?(\d[\s\d]{8,})/i
-    ];
+    // Разбиваем transcript на строки
+    const lines = transcript.split('\n').reverse(); // С конца
     
-    for (const pattern of patterns) {
-      const match = transcript.match(pattern);
+    // Ищем подтверждение номера в последних строках
+    for (const line of lines) {
+      // Паттерн: "Tu número es 6 5 5 3 3 8 8 4 3" или "655 338 843"
+      const match = line.match(/(\d[\s\d]{8,})/);
       if (match) {
-        return match[1].replace(/\s/g, '');
+        const phone = match[1].replace(/\s/g, '');
+        // Проверяем что это похоже на телефон (9+ цифр)
+        if (phone.length >= 9) {
+          return phone;
+        }
       }
     }
     return null;
