@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Phone, Calendar, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ export default function CallsPage() {
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -232,20 +234,24 @@ export default function CallsPage() {
                 <tr className="border-b text-sm text-muted-foreground">
                   <th className="text-left py-3 px-4">Customer</th>
                   <th className="text-left py-3 px-4">Phone Number</th>
-                  <th className="text-left py-3 px-4">Duration</th>
+                  <th className="text-left py-3 px-4">Booking Phone</th>
                   <th className="text-left py-3 px-4">Status</th>
                   <th className="text-left py-3 px-4">Date & Time</th>
-                  <th className="text-left py-3 px-4">Actions</th>
+                  <th className="text-left py-3 px-4">Details</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCalls.map((call) => (
-                  <tr key={call.id} className="border-b hover:bg-muted/50">
+                  <tr 
+                    key={call.id} 
+                    className="border-b hover:bg-muted/50 cursor-pointer"
+                    onClick={() => router.push(`/dashboard/calls/${call.id}`)}
+                  >
                     <td className="py-4 px-4 font-medium">
                       {call.customer_name || "Unknown"}
                     </td>
                     <td className="py-4 px-4">{call.phone}</td>
-                    <td className="py-4 px-4">{formatDuration(call.duration)}</td>
+                    <td className="py-4 px-4 text-muted-foreground">{call.phone}</td>
                     <td className="py-4 px-4">
                       <Badge
                         variant={
@@ -283,7 +289,11 @@ export default function CallsPage() {
           {/* Mobile Cards */}
           <div className="md:hidden space-y-4">
             {filteredCalls.map((call) => (
-              <Card key={call.id}>
+              <Card 
+                key={call.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/dashboard/calls/${call.id}`)}
+              >
                 <CardContent className="pt-6">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

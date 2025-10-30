@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Share2, Clock, Calendar, User, ChevronDown, ChevronUp, Check, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -152,7 +152,22 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
   const [isInstructionExpanded, setIsInstructionExpanded] = useState(false);
   const [instruction, setInstruction] = useState("");
 
-  const call = mockCalls[resolvedParams.id];
+  const [call, setCall] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/calls?id=${resolvedParams.id}`)
+      .then(res => res.json())
+      .then(data => {
+        setCall(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [resolvedParams.id]);
+
+  if (loading) {
+    return <div className="p-8">Loading...</div>;
+  }
 
   if (!call) {
   return (
@@ -245,14 +260,14 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
               </div>
               <div>
                 <p className="font-semibold">{call.customerName}</p>
-                <p className="text-sm text-muted-foreground">{call.phoneNumber}</p>
+                <p className="text-sm text-muted-foreground">{call.phone}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <Calendar className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="font-semibold">{call.timestamp}</p>
+                <p className="font-semibold">{new Date(call.call_date).toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground">Date & Time</p>
               </div>
             </div>
@@ -260,7 +275,7 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
             <div className="flex items-center gap-3">
               <Clock className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="font-semibold">{call.duration}</p>
+                <p className="font-semibold">{Math.floor(call.duration / 60)}:{(call.duration % 60).toString().padStart(2, '0')}</p>
                 <Badge className={
                   call.status === "completed" 
                     ? "bg-green-100 text-green-800 ml-2" 
@@ -395,26 +410,17 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
               minHeight: "300px" 
             }}
           >
-            {mockTranscript.map((message, index) => (
-              <div
-                key={index}
-                className={`p-3 rounded-lg ${
-                  message.speaker === "AI Agent"
-                    ? "bg-primary/10 ml-0 mr-8"
-                    : "bg-muted ml-8 mr-0"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-primary">
-                    {message.speaker}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {message.timestamp}
-                  </span>
-                </div>
-                <p className="text-sm">{message.text}</p>
+            {call.recording_url && (
+              <div className="mb-6">
+                <p className="text-sm font-semibold mb-2">Call Recording</p>
+                <audio controls className="w-full">
+                  <source src={call.recording_url} type="audio/mpeg" />
+                </audio>
               </div>
-            ))}
+            )}
+            <div className="whitespace-pre-wrap text-sm">
+              {call.transcript || "No transcript available"}
+            </div>
           </div>
         </CardContent>
       </Card>
