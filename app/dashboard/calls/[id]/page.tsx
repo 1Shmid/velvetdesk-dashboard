@@ -33,7 +33,7 @@ import { useToast } from "@/hooks/use-toast";
           
           // Если нашли 9+ цифр, берём последние 9
           if (digits.length >= 9) {
-            return digits.slice(-9);
+            return digits.slice(0, 9);
           }
         }
       }
@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
     for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
       const digits = lines[i].replace(/\D/g, '');
       if (digits.length >= 9 && digits.length <= 12) {
-        return digits.slice(-9);
+        return digits.slice(0, 9);
       }
     }
     
