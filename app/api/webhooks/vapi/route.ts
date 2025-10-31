@@ -44,28 +44,27 @@ export async function POST(request: Request) {
     const recordingUrl = payload.message.recordingUrl || '';
 
     // Парсим имя из transcript (ищем после "Sofía" или другое имя)
-    let customerName = 'Unknown';
+    // Парсим имя из User сообщений (короткие ответы после вопроса AI)
+        let customerName = 'Unknown';
 
-    // Ищем имя в transcript после фраз "A nombre de" или "Mi nombre es"
-    const namePatterns = [
-    /nombre\s+(?:de\s+)?([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i,
-    /llamo\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i,
-    /soy\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i
-    ];
+        const messages = artifact.messages || [];
+        const excludeWords = ['quién', 'quien', 'correcto', 'perfecto', 'gracias', 'hola', 'vale', 'si', 'sí', 'no', 'claro', 'momentito'];
 
-    // Исключаем служебные слова
-    const excludeWords = ['correcto', 'perfecto', 'gracias', 'hola', 'vale', 'si', 'no'];
-
-    for (const pattern of namePatterns) {
-    const match = transcript.match(pattern);
-    if (match && match[1]) {
-        const name = match[1].toLowerCase();
-        if (!excludeWords.includes(name)) {
-        customerName = match[1];
-        break;
+        for (const msg of messages) {
+        if (msg.role === 'user') {
+            const text = msg.message?.trim().toLowerCase();
+            if (!text || text.length > 20) continue; // Имя обычно короткое
+            
+            // Проверяем, не служебное ли слово
+            if (!excludeWords.includes(text)) {
+            // Если это похоже на имя (начинается с буквы, без цифр)
+            if (/^[a-záéíóúñ]+$/i.test(text)) {
+                customerName = text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+                break;
+            }
+            }
         }
-    }
-    }
+        }
         
     
 
