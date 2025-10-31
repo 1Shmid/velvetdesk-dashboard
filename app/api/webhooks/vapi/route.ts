@@ -20,6 +20,13 @@ export async function POST(request: Request) {
 
     const call = payload.message?.call;
     const artifact = payload.message?.artifact;
+
+    // DEBUG: Смотрим структуру данных
+    console.log('📦 Artifact structure:', JSON.stringify(artifact, null, 2));
+    console.log('📦 Messages count:', artifact?.messages?.length);
+    if (artifact?.messages?.[0]) {
+    console.log('📦 First message structure:', JSON.stringify(artifact.messages[0], null, 2));
+    }
     
     if (!call || !artifact) {
       return NextResponse.json({ error: 'No call data' }, { status: 400 });
@@ -43,29 +50,68 @@ export async function POST(request: Request) {
     const duration = Math.round(payload.message.durationSeconds || 0);
     const recordingUrl = payload.message.recordingUrl || '';
 
-    // Парсим имя из transcript (ищем после "Sofía" или другое имя)
-    // Парсим имя из User сообщений (короткие ответы после вопроса AI)
+    
+        // Парсим имя из User сообщений
         let customerName = 'Unknown';
 
+        console.log('🔍 Starting name parsing...');
+
         const messages = artifact.messages || [];
+        console.log('📝 Total messages:', messages.length);
+
         const excludeWords = ['quién', 'quien', 'correcto', 'perfecto', 'gracias', 'hola', 'vale', 'si', 'sí', 'no', 'claro', 'momentito'];
 
-        for (const msg of messages) {
-        if (msg.role === 'user') {
-            const text = msg.message?.trim().toLowerCase();
-            if (!text || text.length > 20) continue; // Имя обычно короткое
-            
-            // Проверяем, не служебное ли слово
-            if (!excludeWords.includes(text)) {
-            // Если это похоже на имя (начинается с буквы, без цифр)
-            if (/^[a-záéíóúñ]+$/i.test(text)) {
-                customerName = text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-                break;
-            }
-            }
-        }
-        }
+        for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        console.log(`Message ${i}:`, { role: msg.role, message: msg.message });
         
+        if (msg.role === 'user') {
+            const text = msg.message?.trim();
+            console.log(`  User message: "${text}"`);
+            
+            if (!text || text.length > 20) {
+            console.log(`  Skipped (too long or empty)`);
+            continue;
+            }
+            
+            const textLower = text.toLowerCase();
+            
+            if (excludeWords.includes(textLower)) {
+            console.log(`  Skipped (excluded word)`);
+            continue;
+            }
+            
+            // Проверяем что это похоже на имя
+            if (/^[a-záéíóúñ]+$/i.test(text)) {
+            customerName = text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+            console.log(`✅ Found name: "${customerName}"`);
+            break;
+            }
+        }
+        }
+
+        console.log('🎯 Final customer name:', customerName);
+        
+        // Парсим услугу и время из transcript для улучшенного summary
+        let service = 'Unknown';
+        let bookingTime = '';
+
+        // Ищем услугу в AI сообщениях
+        const serviceMatch = transcript.match(/(?:corte de pelo|manicura|manicure|pedicura|masaje|tinte|coloración)/i);
+        if (serviceMatch) {
+        service = serviceMatch[0];
+        }
+
+        // Ищем время бронирования
+        const timeMatch = transcript.match(/(?:mañana|hoy).*?(?:a las|a)\s+(\d+)/i);
+        if (timeMatch) {
+        const hour = timeMatch[1];
+        const day = transcript.toLowerCase().includes('mañana') ? 'mañana' : 'hoy';
+        bookingTime = `, ${day} a las ${hour}`;
+        }
+
+        // Формируем улучшенный outcome
+        const outcome = `Booking confirmed for ${service}${bookingTime}`;
     
 
     // Сохраняем в Supabase
@@ -78,7 +124,7 @@ export async function POST(request: Request) {
         phone: call.customer?.number || '',
         duration: duration,
         status: 'completed',
-        summary: summary,
+        summary: outcome,
         transcript: transcript,
         recording_url: recordingUrl,
         call_date: new Date().toISOString()
