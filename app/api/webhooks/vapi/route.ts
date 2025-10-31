@@ -45,13 +45,23 @@ export async function POST(request: Request) {
 
     // Парсим имя из transcript (ищем после "Sofía" или другое имя)
     let customerName = 'Unknown';
-    const messages = artifact?.messages || [];
-    for (const msg of messages) {
-    if (msg.role === 'user' && msg.message) {
-        // Простая проверка: если сообщение короткое и начинается с заглавной - это имя
-        const trimmed = msg.message.trim();
-        if (trimmed.length < 20 && /^[A-ZÁÉÍÓÚÑ]/.test(trimmed) && !trimmed.includes(' ')) {
-        customerName = trimmed.replace(/[.,;]$/, '');
+
+    // Ищем имя в transcript после фраз "A nombre de" или "Mi nombre es"
+    const namePatterns = [
+    /nombre\s+(?:de\s+)?([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i,
+    /llamo\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i,
+    /soy\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/i
+    ];
+
+    // Исключаем служебные слова
+    const excludeWords = ['correcto', 'perfecto', 'gracias', 'hola', 'vale', 'si', 'no'];
+
+    for (const pattern of namePatterns) {
+    const match = transcript.match(pattern);
+    if (match && match[1]) {
+        const name = match[1].toLowerCase();
+        if (!excludeWords.includes(name)) {
+        customerName = match[1];
         break;
         }
     }
