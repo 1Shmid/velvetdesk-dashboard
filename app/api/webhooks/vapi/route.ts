@@ -12,7 +12,6 @@ export async function POST(request: Request) {
     
     console.log('VAPI Webhook received:', JSON.stringify(payload, null, 2));
 
-    // Обрабатываем ТОЛЬКО end-of-call-report
     if (payload.message?.type !== 'end-of-call-report') {
       return NextResponse.json({ received: true });
     }
@@ -24,7 +23,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No call data' }, { status: 400 });
     }
 
-    // Находим business_id по assistantId
     const { data: business, error: businessError } = await supabase
       .from('businesses')
       .select('id')
@@ -36,12 +34,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 });
     }
 
-    // Используем готовые данные из payload
     const transcript = payload.message.transcript || '';
     const duration = Math.round(payload.message.durationSeconds || 0);
     const recordingUrl = payload.message.recordingUrl || '';
 
-    // Извлекаем структурированные данные из structuredOutputs
     const structuredOutputs = payload.message?.artifact?.structuredOutputs || {};
     const bookingData = structuredOutputs['367b3094-be1d-413f-8ebc-28b4b8239a43']?.result || {};
 
@@ -51,11 +47,10 @@ export async function POST(request: Request) {
     const serviceRequested = bookingData.service_requested || 'Unknown';
     const bookingDate = bookingData.booking_date || '';
     const bookingTime = bookingData.booking_time || '';
+    const outcome = bookingData.outcome || 'inquiry_only';
 
-    // Формируем outcome
     const enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}, ${bookingDate}${bookingTime ? ', ' + bookingTime : ''}`;
 
-    // Сохраняем в Supabase
     const { data: savedCall, error: callError } = await supabase
       .from('calls')
       .insert({
@@ -79,6 +74,38 @@ export async function POST(request: Request) {
     }
 
     console.log('✅ Call saved:', savedCall.id);
+
+    // Создаём booking если успешный
+    if (outcome === 'booked' && serviceRequested !== 'Unknown') {
+      const { data: services } = await supabase
+        .from('services')
+        .select('id')
+        .eq('business_id', business.id)
+        .ilike('name', serviceRequested)
+        .limit(1);
+
+      if (services && services.length > 0) {
+        const { error: bookingError } = await supabase
+          .from('bookings')
+          .insert({
+            business_id: business.id,
+            call_id: savedCall.id,
+            customer_name: customerName,
+            customer_phone: bookingData.customer_phone || call.customer?.number || '',
+            service_id: services[0].id,
+            booking_date: bookingDate,
+            booking_time: bookingTime,
+            status: 'confirmed'
+          });
+
+        if (bookingError) {
+          console.error('⚠️ Booking error:', bookingError);
+        } else {
+          console.log('✅ Booking created');
+        }
+      }
+    }
+
     return NextResponse.json({ success: true, call_id: savedCall.id });
 
   } catch (error) {
