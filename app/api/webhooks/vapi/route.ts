@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     const duration = Math.round(payload.message.durationSeconds || 0);
     const recordingUrl = payload.message.recordingUrl || '';
 
+    // ПРАВИЛЬНЫЙ путь к данным
     const structuredOutputs = payload.message?.artifact?.structuredOutputs || {};
     const bookingData = structuredOutputs['367b3094-be1d-413f-8ebc-28b4b8239a43']?.result || {};
 
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     const bookingDate = bookingData.booking_date || '';
     const bookingTime = bookingData.booking_time || '';
     const outcome = bookingData.outcome || 'inquiry_only';
+    const customerPhone = bookingData.customer_phone || call.customer?.number || '';
 
     const enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}, ${bookingDate}${bookingTime ? ', ' + bookingTime : ''}`;
 
@@ -75,13 +77,13 @@ export async function POST(request: Request) {
 
     console.log('✅ Call saved:', savedCall.id);
 
-    // Создаём booking если успешный
+    // Создаём booking
     if (outcome === 'booked' && serviceRequested !== 'Unknown') {
       const { data: services } = await supabase
         .from('services')
         .select('id')
         .eq('business_id', business.id)
-        .ilike('name', serviceRequested)
+        .ilike('name', `%${serviceRequested}%`)
         .limit(1);
 
       if (services && services.length > 0) {
@@ -91,7 +93,7 @@ export async function POST(request: Request) {
             business_id: business.id,
             call_id: savedCall.id,
             customer_name: customerName,
-            customer_phone: bookingData.customer_phone || call.customer?.number || '',
+            customer_phone: customerPhone,
             service_id: services[0].id,
             booking_date: bookingDate,
             booking_time: bookingTime,
@@ -103,6 +105,8 @@ export async function POST(request: Request) {
         } else {
           console.log('✅ Booking created');
         }
+      } else {
+        console.log('⚠️ Service not found:', serviceRequested);
       }
     }
 
