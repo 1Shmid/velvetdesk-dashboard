@@ -52,51 +52,49 @@ export async function POST(request: Request) {
 
     
     // Парсим имя из User сообщений
-        // Извлекаем структурированные данные из analysis
-        const analysis = payload.message?.analysis || {};
-        const structuredData = analysis.structuredData || {};
+        // Извлекаем структурированные данные - приоритет structuredOutputs
+        const structuredOutputs = payload.message?.artifact?.structuredOutputs || {};
+        const bookingData = structuredOutputs['367b3094-be1d-413f-8ebc-28b4b8239a43']?.result || {};
 
-        console.log('📊 Structured Data:', JSON.stringify(structuredData, null, 2));
+        const customerName = bookingData.customer_name || 'Unknown';
+        const bookingPhone = bookingData.customer_phone || '';
+        const serviceRequested = bookingData.service_requested || 'Unknown';
+        const bookingDate = bookingData.booking_date || '';
+        const bookingTime = bookingData.booking_time || '';
 
-        // Используем структурированные данные
-        const customerName = structuredData.customer_name || 'Unknown';
-        const bookingPhone = structuredData.customer_phone || '';
-        const serviceRequested = structuredData.service_requested || 'Unknown';
-        const bookingDate = structuredData.booking_date || '';
-        const bookingTime = structuredData.booking_time || '';
-        const callOutcome = structuredData.outcome || 'inquiry_only';
+        console.log('📊 Booking Data:', JSON.stringify(bookingData, null, 2));
 
-        // Формируем улучшенный summary
+        // Формируем outcome
         const enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}, ${bookingDate}${bookingTime ? ', ' + bookingTime : ''}`;
 
     // Сохраняем в Supabase
-    const { data: savedCall, error: callError } = await supabase
-      .from('calls')
-      .insert({
-        business_id: business.id,
-        vapi_call_id: call.id,
-        customer_name: customerName,
-        phone: call.customer?.number || '',
-        duration: duration,
-        status: 'completed',
-        summary: enhancedSummary,
-        transcript: transcript,
-        recording_url: recordingUrl,
-        call_date: new Date().toISOString()
-      })
-      .select()
-      .single();
+        const { data: savedCall, error: callError } = await supabase
+        .from('calls')
+        .insert({
+            business_id: business.id,
+            vapi_call_id: call.id,
+            customer_name: customerName,
+            phone: call.customer?.number || '',
+            duration: duration,
+            status: 'completed',
+            summary: enhancedSummary,
+            transcript: transcript,
+            recording_url: recordingUrl,
+            call_date: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    if (callError) {
-      console.error('Error saving call:', callError);
-      return NextResponse.json({ error: callError.message }, { status: 500 });
+        if (callError) {
+        console.error('Error saving call:', callError);
+        return NextResponse.json({ error: callError.message }, { status: 500 });
+        }
+
+        console.log('✅ Call saved:', savedCall.id);
+        return NextResponse.json({ success: true, call_id: savedCall.id });
+
+    } catch (error) {
+        console.error('Webhook error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    console.log('✅ Call saved:', savedCall.id);
-    return NextResponse.json({ success: true, call_id: savedCall.id });
-
-  } catch (error) {
-    console.error('Webhook error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+    }
