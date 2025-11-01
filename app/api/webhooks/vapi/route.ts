@@ -51,68 +51,23 @@ export async function POST(request: Request) {
     const recordingUrl = payload.message.recordingUrl || '';
 
     
-        // Парсим имя из User сообщений
-        let customerName = 'Unknown';
+    // Парсим имя из User сообщений
+        // Извлекаем структурированные данные из analysis
+        const analysis = payload.message?.analysis || {};
+        const structuredData = analysis.structuredData || {};
 
-        console.log('🔍 Starting name parsing...');
+        console.log('📊 Structured Data:', JSON.stringify(structuredData, null, 2));
 
-        const messages = artifact.messages || [];
-        console.log('📝 Total messages:', messages.length);
+        // Используем структурированные данные
+        const customerName = structuredData.customer_name || 'Unknown';
+        const bookingPhone = structuredData.customer_phone || '';
+        const serviceRequested = structuredData.service_requested || 'Unknown';
+        const bookingDate = structuredData.booking_date || '';
+        const bookingTime = structuredData.booking_time || '';
+        const callOutcome = structuredData.outcome || 'inquiry_only';
 
-        const excludeWords = ['quién', 'quien', 'correcto', 'perfecto', 'gracias', 'hola', 'vale', 'si', 'sí', 'no', 'claro', 'momentito'];
-
-        for (let i = 0; i < messages.length; i++) {
-        const msg = messages[i];
-        console.log(`Message ${i}:`, { role: msg.role, message: msg.message });
-        
-        if (msg.role === 'user') {
-            const text = msg.message?.trim();
-            console.log(`  User message: "${text}"`);
-            
-            if (!text || text.length > 20) {
-            console.log(`  Skipped (too long or empty)`);
-            continue;
-            }
-            
-            const textLower = text.toLowerCase();
-            
-            if (excludeWords.includes(textLower)) {
-            console.log(`  Skipped (excluded word)`);
-            continue;
-            }
-            
-            // Проверяем что это похоже на имя
-            if (/^[a-záéíóúñ]+$/i.test(text)) {
-            customerName = text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-            console.log(`✅ Found name: "${customerName}"`);
-            break;
-            }
-        }
-        }
-
-        console.log('🎯 Final customer name:', customerName);
-        
-        // Парсим услугу и время из transcript для улучшенного summary
-        let service = 'Unknown';
-        let bookingTime = '';
-
-        // Ищем услугу в AI сообщениях
-        const serviceMatch = transcript.match(/(?:corte de pelo|manicura|manicure|pedicura|masaje|tinte|coloración)/i);
-        if (serviceMatch) {
-        service = serviceMatch[0];
-        }
-
-        // Ищем время бронирования
-        const timeMatch = transcript.match(/(?:mañana|hoy).*?(?:a las|a)\s+(\d+)/i);
-        if (timeMatch) {
-        const hour = timeMatch[1];
-        const day = transcript.toLowerCase().includes('mañana') ? 'mañana' : 'hoy';
-        bookingTime = `, ${day} a las ${hour}`;
-        }
-
-        // Формируем улучшенный outcome
-        const outcome = `Booking confirmed for ${service}${bookingTime}`;
-    
+        // Формируем улучшенный summary
+        const enhancedSummary = `${callOutcome}: ${serviceRequested}${bookingDate ? ', ' + bookingDate : ''}${bookingTime ? ' at ' + bookingTime : ''}`;
 
     // Сохраняем в Supabase
     const { data: savedCall, error: callError } = await supabase
@@ -124,7 +79,7 @@ export async function POST(request: Request) {
         phone: call.customer?.number || '',
         duration: duration,
         status: 'completed',
-        summary: outcome,
+        summary: enhancedSummary,
         transcript: transcript,
         recording_url: recordingUrl,
         call_date: new Date().toISOString()
