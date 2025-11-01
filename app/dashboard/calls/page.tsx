@@ -10,33 +10,32 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
-// Утилита для парсинга booking phone
-  const parseBookingPhone = (transcript: string): string | null => {
-    const phonePatterns = [/n[úu]mero/i, /number/i, /номер/i];
-    const lines = transcript.split('\n');
-    
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i];
-      for (const pattern of phonePatterns) {
-        if (pattern.test(line)) {
-          const afterKeyword = line.split(pattern)[1] || '';
-          const digits = afterKeyword.replace(/\D/g, '');
-          if (digits.length >= 9) {
-            return digits.slice(0, 9);
-          }
+const parseBookingPhone = (transcript: string): string | null => {
+  const phonePatterns = [/n[úu]mero/i, /number/i, /номер/i];
+  const lines = transcript.split('\n');
+  
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    for (const pattern of phonePatterns) {
+      if (pattern.test(line)) {
+        const afterKeyword = line.split(pattern)[1] || '';
+        const digits = afterKeyword.replace(/\D/g, '');
+        if (digits.length >= 9) {
+          return digits.slice(0, 9);
         }
       }
     }
-    
-    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
-      const digits = lines[i].replace(/\D/g, '');
-      if (digits.length >= 9 && digits.length <= 12) {
-        return digits.slice(0, 9);
-      }
+  }
+  
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
+    const digits = lines[i].replace(/\D/g, '');
+    if (digits.length >= 9 && digits.length <= 12) {
+      return digits.slice(0, 9);
     }
-    
-    return null;
-  };
+  }
+  
+  return null;
+};
 
 type Call = {
   id: string;
@@ -280,8 +279,8 @@ export default function CallsPage() {
                     </td>
                     <td className="py-4 px-4">{call.phone}</td>
                     <td className="py-4 px-4 text-muted-foreground">
-                      {call.transcript ? (parseBookingPhone(call.transcript) || call.phone) : call.phone}
-                    </td>
+  {call.transcript ? (parseBookingPhone(call.transcript) || call.phone) : call.phone}
+</td>
                     <td className="py-4 px-4">
                       <Badge
                         variant={
