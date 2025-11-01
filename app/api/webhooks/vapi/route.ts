@@ -14,19 +14,11 @@ export async function POST(request: Request) {
 
     // Обрабатываем ТОЛЬКО end-of-call-report
     if (payload.message?.type !== 'end-of-call-report') {
-        return NextResponse.json({ received: true });
+      return NextResponse.json({ received: true });
     }
-
 
     const call = payload.message?.call;
     const artifact = payload.message?.artifact;
-
-    // DEBUG: Смотрим структуру данных
-    console.log('📦 Artifact structure:', JSON.stringify(artifact, null, 2));
-    console.log('📦 Messages count:', artifact?.messages?.length);
-    if (artifact?.messages?.[0]) {
-    console.log('📦 First message structure:', JSON.stringify(artifact.messages[0], null, 2));
-    }
     
     if (!call || !artifact) {
       return NextResponse.json({ error: 'No call data' }, { status: 400 });
@@ -46,55 +38,51 @@ export async function POST(request: Request) {
 
     // Используем готовые данные из payload
     const transcript = payload.message.transcript || '';
-    const summary = payload.message.summary || '';
     const duration = Math.round(payload.message.durationSeconds || 0);
     const recordingUrl = payload.message.recordingUrl || '';
 
-    
-    // Парсим имя из User сообщений
-        // Извлекаем структурированные данные - приоритет structuredOutputs
-        const structuredOutputs = payload.message?.artifact?.structuredOutputs || {};
-        const bookingData = structuredOutputs['367b3094-be1d-413f-8ebc-28b4b8239a43']?.result || {};
+    // Извлекаем структурированные данные из structuredOutputs
+    const structuredOutputs = payload.message?.artifact?.structuredOutputs || {};
+    const bookingData = structuredOutputs['367b3094-be1d-413f-8ebc-28b4b8239a43']?.result || {};
 
-        const customerName = bookingData.customer_name || 'Unknown';
-        const bookingPhone = bookingData.customer_phone || '';
-        const serviceRequested = bookingData.service_requested || 'Unknown';
-        const bookingDate = bookingData.booking_date || '';
-        const bookingTime = bookingData.booking_time || '';
+    console.log('📊 Booking Data:', JSON.stringify(bookingData, null, 2));
 
-        console.log('📊 Booking Data:', JSON.stringify(bookingData, null, 2));
+    const customerName = bookingData.customer_name || 'Unknown';
+    const serviceRequested = bookingData.service_requested || 'Unknown';
+    const bookingDate = bookingData.booking_date || '';
+    const bookingTime = bookingData.booking_time || '';
 
-        // Формируем outcome
-        const enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}, ${bookingDate}${bookingTime ? ', ' + bookingTime : ''}`;
+    // Формируем outcome
+    const enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}, ${bookingDate}${bookingTime ? ', ' + bookingTime : ''}`;
 
     // Сохраняем в Supabase
-        const { data: savedCall, error: callError } = await supabase
-        .from('calls')
-        .insert({
-            business_id: business.id,
-            vapi_call_id: call.id,
-            customer_name: customerName,
-            phone: call.customer?.number || '',
-            duration: duration,
-            status: 'completed',
-            summary: enhancedSummary,
-            transcript: transcript,
-            recording_url: recordingUrl,
-            call_date: new Date().toISOString()
-        })
-        .select()
-        .single();
+    const { data: savedCall, error: callError } = await supabase
+      .from('calls')
+      .insert({
+        business_id: business.id,
+        vapi_call_id: call.id,
+        customer_name: customerName,
+        phone: call.customer?.number || '',
+        duration: duration,
+        status: 'completed',
+        summary: enhancedSummary,
+        transcript: transcript,
+        recording_url: recordingUrl,
+        call_date: new Date().toISOString()
+      })
+      .select()
+      .single();
 
-        if (callError) {
-        console.error('Error saving call:', callError);
-        return NextResponse.json({ error: callError.message }, { status: 500 });
-        }
-
-        console.log('✅ Call saved:', savedCall.id);
-        return NextResponse.json({ success: true, call_id: savedCall.id });
-
-    } catch (error) {
-        console.error('Webhook error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (callError) {
+      console.error('Error saving call:', callError);
+      return NextResponse.json({ error: callError.message }, { status: 500 });
     }
-    }
+
+    console.log('✅ Call saved:', savedCall.id);
+    return NextResponse.json({ success: true, call_id: savedCall.id });
+
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
