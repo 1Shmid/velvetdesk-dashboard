@@ -67,7 +67,7 @@ export async function POST(request: Request) {
         const callOutcome = structuredData.outcome || 'inquiry_only';
 
         // Формируем улучшенный summary
-        const enhancedSummary = `${callOutcome}: ${serviceRequested}${bookingDate ? ', ' + bookingDate : ''}${bookingTime ? ' at ' + bookingTime : ''}`;
+        const enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}, ${bookingDate}${bookingTime ? ', ' + bookingTime : ''}`;
 
     // Сохраняем в Supabase
     const { data: savedCall, error: callError } = await supabase
