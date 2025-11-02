@@ -98,7 +98,7 @@ console.log('✅ Services found:', services?.length || 0);
       workingHoursText: hoursText
     };
 
-    return NextResponse.json({ result: JSON.stringify(result) });
+     return NextResponse.json(result);
 
   } catch (error) {
     console.error('❌ Get services error:', error);
