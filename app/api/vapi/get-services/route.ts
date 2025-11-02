@@ -16,7 +16,7 @@ const corsHeaders = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const assistantId = body.message?.call?.assistantId;
+    const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2'; // fallback для теста
 
     if (!assistantId) {
       return NextResponse.json(
