@@ -473,7 +473,7 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
         <CardContent className="space-y-2">
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <p className="text-sm">
-              <strong>Outcome:</strong> Booking confirmed{service ? ` for ${service}` : ''}{call.summary ? `, ${call.summary.split('for ')[1]?.split('.')[0] || ''}` : ''}
+              <strong>Outcome:</strong> {call.summary || 'No summary available'}
             </p>
             <p className="text-sm">
               <strong>Action Items:</strong> Send SMS reminder on Thursday
