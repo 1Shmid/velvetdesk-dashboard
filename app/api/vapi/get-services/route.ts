@@ -6,6 +6,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// CORS headers для VAPI
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -14,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (!assistantId) {
       return NextResponse.json(
         { error: 'Missing assistant_id' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -31,7 +38,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Business not found:', businessError);
       return NextResponse.json(
         { error: 'Business not found' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -47,11 +54,11 @@ export async function POST(request: NextRequest) {
       console.error('❌ Services error:', servicesError);
       return NextResponse.json(
         { error: 'Failed to fetch services' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
-console.log('✅ Services found:', services?.length || 0);
+    console.log('✅ Services found:', services?.length || 0);
 
     // Получаем часы работы
     const { data: hours, error: hoursError } = await supabase
@@ -91,25 +98,26 @@ console.log('✅ Services found:', services?.length || 0);
       .map(([day, times]) => `${day}: ${times.open}-${times.close}`)
       .join(', ');
 
-    const result = {
-      services: formattedServices,
-      servicesText: servicesText,
-      workingHours: workingHours,
-      workingHoursText: hoursText
-    };
-
-     // VAPI Custom Tools нужен текстовый результат
+    // VAPI Custom Tools нужен текстовый результат
     const textResult = `Available Services:\n${servicesText}\n\nWorking Hours:\n${hoursText}`;
     
     return NextResponse.json({ 
       result: textResult 
-    });
+    }, { headers: corsHeaders });
 
   } catch (error) {
     console.error('❌ Get services error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
+}
+
+// OPTIONS handler для CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
 }
