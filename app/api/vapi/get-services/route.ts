@@ -82,11 +82,23 @@ console.log('✅ Services found:', services?.length || 0);
       description: s.description || ''
     })) || [];
 
-    return NextResponse.json({
+    // Форматируем для AI как текст
+    const servicesText = formattedServices.map(s => 
+      `${s.name}: ${s.price}, ${s.duration}`
+    ).join('; ');
+
+    const hoursText = Object.entries(workingHours)
+      .map(([day, times]) => `${day}: ${times.open}-${times.close}`)
+      .join(', ');
+
+    const result = {
       services: formattedServices,
-      count: formattedServices.length,
-      working_hours: workingHours
-    });
+      servicesText: servicesText,
+      workingHours: workingHours,
+      workingHoursText: hoursText
+    };
+
+    return NextResponse.json({ result: JSON.stringify(result) });
 
   } catch (error) {
     console.error('❌ Get services error:', error);
