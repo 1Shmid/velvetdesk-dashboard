@@ -98,7 +98,12 @@ console.log('✅ Services found:', services?.length || 0);
       workingHoursText: hoursText
     };
 
-     return NextResponse.json(result);
+     // VAPI Custom Tools нужен текстовый результат
+    const textResult = `Available Services:\n${servicesText}\n\nWorking Hours:\n${hoursText}`;
+    
+    return NextResponse.json({ 
+      result: textResult 
+    });
 
   } catch (error) {
     console.error('❌ Get services error:', error);
