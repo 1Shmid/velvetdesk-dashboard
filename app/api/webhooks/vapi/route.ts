@@ -38,9 +38,8 @@ export async function POST(request: Request) {
     const duration = Math.round(payload.message.durationSeconds || 0);
     const recordingUrl = payload.message.recordingUrl || '';
 
-    // ПРАВИЛЬНЫЙ путь к данным
-    const structuredOutputs = payload.message?.artifact?.structuredOutputs || {};
-    const bookingData = structuredOutputs['367b3094-be1d-413f-8ebc-28b4b8239a43']?.result || {};
+    // Данные приходят в analysis.structuredData
+    const bookingData = payload.message?.analysis?.structuredData || {};
 
     console.log('📊 Booking Data:', JSON.stringify(bookingData, null, 2));
 
