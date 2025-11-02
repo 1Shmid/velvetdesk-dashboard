@@ -51,7 +51,15 @@ export async function POST(request: Request) {
     const outcome = bookingData.outcome || 'inquiry_only';
     const customerPhone = bookingData.customer_phone || call.customer?.number || '';
 
-    const enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}, ${bookingDate}${bookingTime ? ', ' + bookingTime : ''}`;
+    // Формируем summary на основе outcome
+    let enhancedSummary = '';
+    if (outcome === 'booked') {
+    enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}${bookingDate ? ', ' + bookingDate : ''}${bookingTime ? ', ' + bookingTime : ''}`;
+    } else if (outcome === 'cancelled') {
+    enhancedSummary = `Booking cancelled by ${customerName}`;
+    } else {
+    enhancedSummary = `Inquiry about ${serviceRequested} by ${customerName}`;
+    }
 
     const { data: savedCall, error: callError } = await supabase
       .from('calls')
