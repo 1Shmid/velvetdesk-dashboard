@@ -56,9 +56,10 @@ console.log('✅ Services found:', services?.length || 0);
     // Получаем часы работы
     const { data: hours, error: hoursError } = await supabase
       .from('working_hours')
-      .select('day_of_week, open_time, close_time')
+      .select('day, open_time, close_time, is_closed')
       .eq('business_id', business.id)
-      .order('day_of_week');
+      .eq('is_closed', false)
+      .order('day');
 
     if (hoursError) {
       console.error('⚠️ Hours error:', hoursError);
@@ -66,12 +67,12 @@ console.log('✅ Services found:', services?.length || 0);
 
     // Форматируем часы для AI
     const workingHours = hours?.reduce((acc, h) => {
-      acc[h.day_of_week] = {
+      acc[h.day] = {
         open: h.open_time,
         close: h.close_time
       };
       return acc;
-    }, {} as Record<number, { open: string; close: string }>) || {};
+    }, {} as Record<string, { open: string; close: string }>) || {};
 
     // Форматируем для AI
     const formattedServices = services?.map(s => ({
