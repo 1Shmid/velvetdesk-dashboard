@@ -1,7 +1,8 @@
+// app/api/vapi/start/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-const createClient = () => 
+const createClient = () =>
   import('@supabase/supabase-js').then(({ createClient }) =>
     createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,15 +37,16 @@ export async function POST(request: NextRequest) {
     const { data: services } = await client
       .from('services')
       .select('name, price, duration')
-      .eq('business_id', business.id);
+      .eq('business_id', business.id)
+      .eq('is_active', true);
 
-    // 3. Часы
+    // 3. Часы работы
     const { data: hours } = await client
       .from('working_hours')
-      .select('day, open_time, close_time')
+      .select('day, open_time, close_time, is_closed')
       .eq('business_id', business.id);
 
-    // 4. Запуск звонка
+    // 4. Запуск звонка с контекстом
     const callResponse = await fetch(VAPI_API_URL, {
       method: 'POST',
       headers: VAPI_HEADERS,
