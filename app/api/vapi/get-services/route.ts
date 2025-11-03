@@ -16,6 +16,10 @@ const corsHeaders = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // Извлекаем toolCallId из запроса
+    const toolCallId = body.message?.toolCallId || body.toolCallId;
+
     const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2'; // fallback для теста
 
     if (!assistantId) {
@@ -102,13 +106,11 @@ export async function POST(request: NextRequest) {
     // VAPI Custom Tools - возвращаем текст напрямую
     const textResult = `Available Services:\n${servicesText}\n\nWorking Hours:\n${hoursText}`;
     
-    return new NextResponse(textResult, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/plain',
-      },
-    });
+    // VAPI Custom Tools формат
+    return NextResponse.json({
+      toolCallId: toolCallId,
+      result: textResult
+    }, { headers: corsHeaders });
 
   } catch (error) {
     console.error('❌ Get services error:', error);
