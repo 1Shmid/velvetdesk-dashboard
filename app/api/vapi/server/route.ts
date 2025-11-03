@@ -14,13 +14,11 @@ export async function POST(request: NextRequest) {
     const payload = await request.json();
     console.log('VAPI server payload:', JSON.stringify(payload, null, 2));
 
-    if (payload.type !== 'conversation-update') {
-      return NextResponse.json({}); // Ignore other events
-    }
+    // Обрабатываем conversation-update
+    if (payload.type === 'conversation-update' && payload.conversation?.status === 'in-progress') {
+      const { assistantId } = payload.assistant || {};
+      if (!assistantId) return NextResponse.json({});
 
-    // На старте (call.start) — fetch data
-    if (payload.conversation?.status === 'started') {
-      const { assistantId } = payload;
       const client = await createClient();
 
       const { data: business } = await client
@@ -29,9 +27,7 @@ export async function POST(request: NextRequest) {
         .eq('vapi_assistant_id', assistantId)
         .single();
 
-      if (!business) {
-        return NextResponse.json({});
-      }
+      if (!business) return NextResponse.json({});
 
       const { data: services } = await client
         .from('services')
@@ -44,17 +40,17 @@ export async function POST(request: NextRequest) {
         .select('day, open_time, close_time, is_closed')
         .eq('business_id', business.id);
 
-      // Добавляем message в conversation
       return NextResponse.json({
         messages: [
           {
-            type: 'text',
-            content: `Current services: ${JSON.stringify(services || [])}. Working hours: ${JSON.stringify(hours || [])}. Use ONLY this info for bookings and questions.`
+            type: 'request-response',
+            content: `Current services: ${JSON.stringify(services || [])}. Working hours: ${JSON.stringify(hours || [])}. Use ONLY this information.`
           }
         ]
       });
     }
 
+    // end-of-call-report — уже есть в webhook
     return NextResponse.json({});
   } catch (error: any) {
     console.error('VAPI server error:', error);
