@@ -99,11 +99,16 @@ export async function POST(request: NextRequest) {
       .join(', ');
 
     // VAPI Custom Tools нужен текстовый результат
+    // VAPI Custom Tools - возвращаем текст напрямую
     const textResult = `Available Services:\n${servicesText}\n\nWorking Hours:\n${hoursText}`;
     
-    return NextResponse.json({ 
-      result: textResult 
-    }, { headers: corsHeaders });
+    return new NextResponse(textResult, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/plain',
+      },
+    });
 
   } catch (error) {
     console.error('❌ Get services error:', error);
