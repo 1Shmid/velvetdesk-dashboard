@@ -12,54 +12,52 @@ const createClient = () =>
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
-    console.log('VAPI server request:', JSON.stringify(payload, null, 2));
+    console.log('VAPI server payload:', JSON.stringify(payload, null, 2));
 
-    if (payload.type !== 'assistant-request') {
+    if (payload.type !== 'conversation-update') {
       return NextResponse.json({}); // Ignore other events
     }
 
-    const { assistantId } = payload;
-    const client = await createClient();
+    // На старте (call.start) — fetch data
+    if (payload.conversation?.status === 'started') {
+      const { assistantId } = payload;
+      const client = await createClient();
 
-    // Fetch business
-    const { data: business } = await client
-      .from('businesses')
-      .select('id')
-      .eq('vapi_assistant_id', assistantId)
-      .single();
+      const { data: business } = await client
+        .from('businesses')
+        .select('id')
+        .eq('vapi_assistant_id', assistantId)
+        .single();
 
-    if (!business) {
-      return NextResponse.json({ assistant: {} });
+      if (!business) {
+        return NextResponse.json({});
+      }
+
+      const { data: services } = await client
+        .from('services')
+        .select('name, price, duration')
+        .eq('business_id', business.id)
+        .eq('is_active', true);
+
+      const { data: hours } = await client
+        .from('working_hours')
+        .select('day, open_time, close_time, is_closed')
+        .eq('business_id', business.id);
+
+      // Добавляем message в conversation
+      return NextResponse.json({
+        messages: [
+          {
+            type: 'text',
+            content: `Current services: ${JSON.stringify(services || [])}. Working hours: ${JSON.stringify(hours || [])}. Use ONLY this info for bookings and questions.`
+          }
+        ]
+      });
     }
 
-    // Fetch services
-    const { data: services } = await client
-      .from('services')
-      .select('name, price, duration')
-      .eq('business_id', business.id)
-      .eq('is_active', true);
-
-    // Fetch hours
-    const { data: hours } = await client
-      .from('working_hours')
-      .select('day, open_time, close_time, is_closed')
-      .eq('business_id', business.id);
-
-    // Return enriched assistant config
-    return NextResponse.json({
-      assistant: {
-        model: {
-          messages: [
-            {
-              type: 'text',
-              content: `Current services: ${JSON.stringify(services || [])}. Working hours: ${JSON.stringify(hours || [])}. Use ONLY this info for bookings and questions.`
-            }
-          ]
-        }
-      }
-    });
+    return NextResponse.json({});
   } catch (error: any) {
     console.error('VAPI server error:', error);
-    return NextResponse.json({ assistant: {} });
+    return NextResponse.json({});
   }
 }
