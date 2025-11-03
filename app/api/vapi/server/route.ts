@@ -9,12 +9,19 @@ const createClient = () =>
     )
   );
 
+// ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+// 1. Добавь GET (VAPI проверяет)
+export async function GET() {
+  return NextResponse.json({ status: 'ok' });
+}
+// ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
     console.log('VAPI server payload:', JSON.stringify(payload, null, 2));
 
-    // Обрабатываем conversation-update
+    // 2. Обрабатываем conversation-update (на старте)
     if (payload.type === 'conversation-update' && payload.conversation?.status === 'in-progress') {
       const { assistantId } = payload.assistant || {};
       if (!assistantId) return NextResponse.json({});
@@ -40,17 +47,19 @@ export async function POST(request: NextRequest) {
         .select('day, open_time, close_time, is_closed')
         .eq('business_id', business.id);
 
+      // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+      // 3. Возвращаем messages в формате VAPI
       return NextResponse.json({
         messages: [
           {
-            type: 'request-response',
-            content: `Current services: ${JSON.stringify(services || [])}. Working hours: ${JSON.stringify(hours || [])}. Use ONLY this information.`
+            role: 'system',
+            content: `Current services: ${JSON.stringify(services || [])}. Working hours: ${JSON.stringify(hours || [])}. Use ONLY this information for all responses.`
           }
         ]
       });
+      // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
     }
 
-    // end-of-call-report — уже есть в webhook
     return NextResponse.json({});
   } catch (error: any) {
     console.error('VAPI server error:', error);
