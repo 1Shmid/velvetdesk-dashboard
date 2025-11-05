@@ -15,9 +15,12 @@ const corsHeaders = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('🔍 VAPI Context called:', JSON.stringify(body, null, 2));
     const assistantId = body.call?.assistantId || body.assistant?.id;
+    console.log('🎯 Assistant ID:', assistantId);
     
     if (!assistantId) {
+        console.log('❌ No assistant ID found in payload');
       return NextResponse.json({ messages: [] }, { headers: corsHeaders });
     }
 
@@ -50,6 +53,9 @@ export async function POST(request: NextRequest) {
     const hoursText = hours?.map(h => 
       `${h.day}: ${h.open_time}-${h.close_time}`
     ).join(', ') || 'Hours not configured';
+
+    console.log('✅ Returning services:', servicesText);
+    console.log('✅ Returning hours:', hoursText);
 
     return NextResponse.json({
       messages: [
