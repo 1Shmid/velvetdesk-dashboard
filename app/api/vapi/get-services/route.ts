@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log('🔧 getServices called:', JSON.stringify(body, null, 2));
+
+    const toolCallId = body.message?.toolCallList?.[0]?.id || 
+                       body.message?.toolCalls?.[0]?.id;
+    console.log('🔑 Tool Call ID:', toolCallId);
     
     const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2';
 
@@ -27,7 +31,12 @@ export async function POST(request: NextRequest) {
 
     if (!business) {
       return NextResponse.json({
-        result: "Services temporarily unavailable"
+        results: [
+          {
+            toolCallId: toolCallId,
+            result: "Services temporarily unavailable"
+          }
+        ]
       }, { headers: corsHeaders });
     }
 
@@ -54,13 +63,27 @@ export async function POST(request: NextRequest) {
     console.log('✅ Returning:', servicesText);
 
     return NextResponse.json({
-      result: `Servicios: ${servicesText}. Horario: ${hoursText}`
+      results: [
+        {
+          toolCallId: toolCallId,
+          result: `Servicios: ${servicesText}. Horario: ${hoursText}`
+        }
+      ]
     }, { headers: corsHeaders });
 
   } catch (error) {
     console.error('❌ getServices error:', error);
+    const body = await request.json().catch(() => ({}));
+    const toolCallId = body.message?.toolCallList?.[0]?.id || 
+                       body.message?.toolCalls?.[0]?.id;
+    
     return NextResponse.json({
-      result: "Error al cargar servicios"
+      results: [
+        {
+          toolCallId: toolCallId,
+          result: "Error al cargar servicios"
+        }
+      ]
     }, { headers: corsHeaders });
   }
 }
