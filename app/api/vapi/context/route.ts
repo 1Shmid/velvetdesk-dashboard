@@ -58,12 +58,16 @@ export async function POST(request: NextRequest) {
     console.log('✅ Returning hours:', hoursText);
 
     return NextResponse.json({
-      messages: [
-        {
-          role: "system",
-          content: `AVAILABLE SERVICES:\n${servicesText}\n\nWORKING HOURS:\n${hoursText}`
+    assistant: {
+        model: {
+        messages: [
+            {
+            role: "system",
+            content: `AVAILABLE SERVICES:\n${servicesText}\n\nWORKING HOURS:\n${hoursText}`
+            }
+        ]
         }
-      ]
+    }
     }, { headers: corsHeaders });
 
   } catch (error) {
