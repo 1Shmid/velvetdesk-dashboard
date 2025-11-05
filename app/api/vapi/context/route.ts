@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log('🔍 VAPI Context called:', JSON.stringify(body, null, 2));
-    const assistantId = body.call?.assistantId || body.assistant?.id;
+    const assistantId = body.message?.call?.assistantId || body.call?.assistantId || body.assistant?.id;
     console.log('🎯 Assistant ID:', assistantId);
     
     if (!assistantId) {
