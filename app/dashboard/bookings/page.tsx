@@ -9,7 +9,8 @@ import { ChevronDown, ChevronUp, Phone, FileText } from 'lucide-react';
 interface Booking {
   id: string;
   customer_name: string;
-  customer_phone: string;
+  customer_phone: string;   // С какого звонил
+  booking_phone: string;    // Для связи
   booking_date: string;
   booking_time: string;
   status: string;
@@ -121,7 +122,7 @@ export default function BookingsPage() {
                       >
                         <div className="flex-1">
                           <p className="font-semibold">{booking.customer_name}</p>
-                          <p className="text-sm text-muted-foreground">{booking.customer_phone}</p>
+                          <p className="text-sm text-muted-foreground">{booking.booking_phone}</p>
                           <p className="text-sm">{booking.services?.name} - {booking.booking_time}</p>
                         </div>
                         <div className="flex items-center gap-3">

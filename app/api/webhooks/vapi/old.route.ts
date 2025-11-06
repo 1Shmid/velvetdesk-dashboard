@@ -46,8 +46,7 @@ export async function POST(request: Request) {
     const bookingDate       = bookingData.booking_date       || '';
     const bookingTime       = bookingData.booking_time       || '';
     const outcome           = bookingData.outcome            || 'inquiry_only';
-    const customerPhone = call.customer?.number || '';  // С какого номера звонил
-    const bookingPhone = bookingData.customer_phone || '';  // Какой назвал для записи
+    const customerPhone     = bookingData.customer_phone     || call.customer?.number || '';
 
     // Формируем summary на основе outcome
     let enhancedSummary = '';
@@ -65,8 +64,8 @@ export async function POST(request: Request) {
         business_id: business.id,
         vapi_call_id: call.id,
         customer_name: customerName,
-        customer_phone: customerPhone,  // С какого звонил
-        booking_phone: bookingPhone,    // Назвал для записи
+        phone: call.customer?.number || '',
+        customer_phone: customerPhone,
         duration: duration,
         status: outcome === 'booked' ? 'booked' : 'missed',
         summary: enhancedSummary,
@@ -127,8 +126,7 @@ export async function POST(request: Request) {
             business_id: business.id,
             call_id: savedCall.id,
             customer_name: customerName,
-            customer_phone: customerPhone,  // С какого звонил
-            booking_phone: bookingPhone,    // Для связи
+            customer_phone: customerPhone,
             service_id: services[0].id,
             booking_date: bookingDate,
             booking_time: bookingTime,

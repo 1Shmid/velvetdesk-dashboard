@@ -322,7 +322,7 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
             <Clock className="h-5 w-5 text-muted-foreground" />
             <span className="font-semibold">{Math.floor(call.duration / 60)}:{(call.duration % 60).toString().padStart(2, '0')}</span>
           </div>
-          <Badge className={call.status === "completed" ? "bg-green-500" : "bg-red-500"}>
+          <Badge className={call.status === "booked" ? "bg-green-500" : "bg-red-500"}>
             {call.status.charAt(0).toUpperCase() + call.status.slice(1)}
           </Badge>
         </div>
