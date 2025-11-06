@@ -39,16 +39,16 @@ export async function POST(request: Request) {
     const recordingUrl = payload.message.recordingUrl || '';
 
     // Данные приходят в analysis.structuredData
-    const bookingData = payload.message?.analysis?.structuredData || {};
+    // const bookingData = payload.message?.analysis?.structuredData || {};
 
-    console.log('📊 Booking Data:', JSON.stringify(bookingData, null, 2));
+    const structuredData = payload.message?.structuredOutputs || {};
 
-    const customerName = bookingData.customer_name || 'Unknown';
-    const serviceRequested = bookingData.service_requested || 'Unknown';
-    const bookingDate = bookingData.booking_date || '';
-    const bookingTime = bookingData.booking_time || '';
-    const outcome = bookingData.outcome || 'inquiry_only';
-    const customerPhone = bookingData.customer_phone || call.customer?.number || '';
+    const customerName      = structuredData.customer_name      || 'Unknown';
+    const serviceRequested  = structuredData.service_requested  || 'Unknown';
+    const bookingDate       = structuredData.booking_date       || '';
+    const bookingTime       = structuredData.booking_time       || '';
+    const outcome           = structuredData.outcome            || 'inquiry_only';
+    const customerPhone     = structuredData.customer_phone     || call.customer?.number || '';
 
     // Формируем summary на основе outcome
     let enhancedSummary = '';
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         phone: call.customer?.number || '',
         customer_phone: customerPhone,
         duration: duration,
-        status: 'completed',
+        status: outcome === 'booked' ? 'completed' : 'missed',
         summary: enhancedSummary,
         transcript: transcript,
         recording_url: recordingUrl,
@@ -85,8 +85,22 @@ export async function POST(request: Request) {
 
     console.log('✅ Call saved:', savedCall.id);
 
+    console.log('🔍 Booking check:', {
+        outcome,
+        serviceRequested,
+        customerName,
+        bookingDate,
+        bookingTime
+        });
+
     // Создаём booking
     if (outcome === 'booked' && serviceRequested !== 'Unknown') {
+
+        console.log('🔍 Service search:', {
+            searchTerm: serviceRequested,
+            business_id: business.id
+        });
+
       const { data: services } = await supabase
         .from('services')
         .select('id')
@@ -94,7 +108,20 @@ export async function POST(request: Request) {
         .ilike('name', `%${serviceRequested}%`)
         .limit(1);
 
+        console.log('🔍 Service found:', {
+            found: services?.length || 0,
+            serviceId: services?.[0]?.id
+        });
+
       if (services && services.length > 0) {
+
+        console.log('✅ Creating booking:', {
+            customer_name: customerName,
+            service_id: services[0].id,
+            booking_date: bookingDate,
+            booking_time: bookingTime
+            });
+
         const { error: bookingError } = await supabase
           .from('bookings')
           .insert({
@@ -109,10 +136,10 @@ export async function POST(request: Request) {
           });
 
         if (bookingError) {
-          console.error('⚠️ Booking error:', bookingError);
-        } else {
-          console.log('✅ Booking created');
-        }
+            console.error('❌ Booking error:', bookingError);
+            } else {
+            console.log('✅ Booking created successfully');
+            }
       } else {
         console.log('⚠️ Service not found:', serviceRequested);
       }
