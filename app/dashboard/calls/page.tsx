@@ -10,37 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
-const parseBookingPhone = (transcript: string): string | null => {
-  const phonePatterns = [/n[úu]mero/i, /number/i, /номер/i];
-  const lines = transcript.split('\n');
-  
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    for (const pattern of phonePatterns) {
-      if (pattern.test(line)) {
-        const afterKeyword = line.split(pattern)[1] || '';
-        const digits = afterKeyword.replace(/\D/g, '');
-        if (digits.length >= 9) {
-          return digits.slice(0, 9);
-        }
-      }
-    }
-  }
-  
-  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
-    const digits = lines[i].replace(/\D/g, '');
-    if (digits.length >= 9 && digits.length <= 12) {
-      return digits.slice(0, 9);
-    }
-  }
-  
-  return null;
-};
-
 type Call = {
   id: string;
   customer_name: string;
-  phone: string;
+  customer_phone: string;   // С какого звонил
+  booking_phone: string;    // Назвал для записи
   duration: number;
   status: string;
   call_date: string;
@@ -110,7 +84,8 @@ export default function CallsPage() {
       filtered = filtered.filter(
         (call) =>
           call.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          call.phone?.includes(searchQuery)
+          call.customer_phone?.includes(searchQuery) ||
+          call.booking_phone?.includes(searchQuery)
       );
     }
 
@@ -119,12 +94,12 @@ export default function CallsPage() {
 
   const stats = {
     total: calls.length,
-    completed: calls.filter((c) => c.status === "completed").length,
+    booked: calls.filter((c) => c.status === "booked").length,
     missed: calls.filter((c) => c.status === "missed").length,
   };
 
   const successRate = stats.total > 0 
-    ? Math.round((stats.completed / stats.total) * 100) 
+    ? Math.round((stats.booked / stats.total) * 100) 
     : 0;
 
   const formatDuration = (seconds: number) => {
@@ -199,17 +174,17 @@ export default function CallsPage() {
 
         <Card
           className={`cursor-pointer transition-colors ${
-            statusFilter === "completed" ? "border-primary" : ""
+            statusFilter === "booked" ? "border-primary" : ""
           }`}
-          onClick={() => setStatusFilter("completed")}
+          onClick={() => setStatusFilter("booked")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium">Booked</CardTitle>
             <Phone className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {stats.completed}
+              {stats.booked}
             </div>
             <p className="text-xs text-muted-foreground">
               {successRate}% success rate
@@ -277,21 +252,23 @@ export default function CallsPage() {
                     <td className="py-4 px-4 font-medium">
                       {call.customer_name || "Unknown"}
                     </td>
-                    <td className="py-4 px-4">{call.phone}</td>
-                    <td className="py-4 px-4 text-muted-foreground">
-  {call.transcript ? (parseBookingPhone(call.transcript) || call.phone) : call.phone}
-</td>
+                    <td className="py-4 px-4 text-sm text-muted-foreground">
+                      {call.customer_phone}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-muted-foreground">
+                      {call.booking_phone}
+                    </td>
                     <td className="py-4 px-4">
                       <Badge
                         variant={
-                          call.status === "completed"
+                          call.status === "booked"
                             ? "default"
                             : call.status === "missed"
                             ? "destructive"
                             : "secondary"
                         }
                         className={
-                          call.status === "completed"
+                          call.status === "booked"
                             ? "bg-green-500 hover:bg-green-600"
                             : ""
                         }
@@ -320,11 +297,14 @@ export default function CallsPage() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h3 className="font-semibold text-base">{call.customer_name || "Unknown"}</h3>
-                        <p className="text-sm text-muted-foreground">{call.phone}</p>
+                        <p className="text-sm text-muted-foreground">{call.customer_phone}</p>
+                        {call.booking_phone && call.booking_phone !== call.customer_phone && (
+                          <p className="text-xs text-muted-foreground">Booking: {call.booking_phone}</p>
+                        )}
                       </div>
                       <Badge
-                        variant={call.status === "completed" ? "default" : "destructive"}
-                        className={call.status === "completed" ? "bg-green-500 hover:bg-green-600" : ""}
+                        variant={call.status === "booked" ? "default" : "destructive"}
+                        className={call.status === "booked" ? "bg-green-500 hover:bg-green-600" : ""}
                       >
                         {call.status.charAt(0).toUpperCase() + call.status.slice(1)}
                       </Badge>
