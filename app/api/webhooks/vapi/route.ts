@@ -92,6 +92,34 @@ export async function POST(request: Request) {
         bookingTime
         });
 
+        // Преобразуем "mañana/tomorrow" в реальную дату
+        const parseBookingDate = (dateStr: string): string => {
+        const lowerDate = dateStr.toLowerCase();
+        const today = new Date();
+        
+        if (lowerDate.includes('mañana') || lowerDate.includes('tomorrow')) {
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+            return tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+        }
+        
+        if (lowerDate.includes('hoy') || lowerDate.includes('today')) {
+            return today.toISOString().split('T')[0];
+        }
+        
+        // Если уже в формате даты - вернуть как есть
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return dateStr;
+        }
+        
+        // По умолчанию - завтра
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+        };
+
+        const parsedBookingDate = parseBookingDate(bookingDate);
+
     // Создаём booking
     if (outcome === 'booked' && serviceRequested !== 'Unknown') {
 
@@ -160,7 +188,7 @@ export async function POST(request: Request) {
             customer_phone: customerPhone,  // С какого звонил
             booking_phone: bookingPhone,    // Для связи
             service_id: services[0].id,
-            booking_date: bookingDate,
+            booking_date: parsedBookingDate,  // ✅ Используем преобразованную дату
             booking_time: bookingTime,
             status: 'booked'
           });
@@ -169,6 +197,15 @@ export async function POST(request: Request) {
             console.error('❌ Booking error:', bookingError);
             } else {
             console.log('✅ Booking created successfully');
+
+            // Обновляем summary с правильным названием сервиса из базы
+            const correctServiceName = services[0].name;
+            const updatedSummary = `Booking confirmed for ${customerName}, ${correctServiceName}, ${parsedBookingDate}, ${bookingTime}`;
+
+            await supabase
+            .from('calls')
+            .update({ summary: updatedSummary })
+            .eq('id', savedCall.id);
             }
       } else {
         console.log('⚠️ Service not found:', serviceRequested);
