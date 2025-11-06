@@ -39,16 +39,14 @@ export async function POST(request: Request) {
     const recordingUrl = payload.message.recordingUrl || '';
 
     // Данные приходят в analysis.structuredData
-    // const bookingData = payload.message?.analysis?.structuredData || {};
+    const bookingData = payload.message?.analysis?.structuredData || {};
 
-    const structuredData = payload.message?.structuredOutputs || {};
-
-    const customerName      = structuredData.customer_name      || 'Unknown';
-    const serviceRequested  = structuredData.service_requested  || 'Unknown';
-    const bookingDate       = structuredData.booking_date       || '';
-    const bookingTime       = structuredData.booking_time       || '';
-    const outcome           = structuredData.outcome            || 'inquiry_only';
-    const customerPhone     = structuredData.customer_phone     || call.customer?.number || '';
+    const customerName      = bookingData.customer_name      || 'Unknown';
+    const serviceRequested  = bookingData.service_requested  || 'Unknown';
+    const bookingDate       = bookingData.booking_date       || '';
+    const bookingTime       = bookingData.booking_time       || '';
+    const outcome           = bookingData.outcome            || 'inquiry_only';
+    const customerPhone     = bookingData.customer_phone     || call.customer?.number || '';
 
     // Формируем summary на основе outcome
     let enhancedSummary = '';
@@ -69,7 +67,7 @@ export async function POST(request: Request) {
         phone: call.customer?.number || '',
         customer_phone: customerPhone,
         duration: duration,
-        status: outcome === 'booked' ? 'completed' : 'missed',
+        status: outcome === 'booked' ? 'booked' : 'missed',
         summary: enhancedSummary,
         transcript: transcript,
         recording_url: recordingUrl,
