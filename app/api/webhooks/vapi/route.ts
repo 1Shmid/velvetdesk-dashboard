@@ -100,12 +100,42 @@ export async function POST(request: Request) {
             business_id: business.id
         });
 
-      const { data: services } = await supabase
+      // Нормализация для поиска
+        const normalizeService = (name: string) => {
+        return name
+            .toLowerCase()
+            .replace(/corte de pelo/gi, 'corte de cabello')
+            .replace(/tinte de pelo/gi, 'tinte y coloración')
+            .trim();
+        };
+
+        const normalizedSearch = normalizeService(serviceRequested);
+
+        console.log('🔍 Service search:', {
+        original: serviceRequested,
+        normalized: normalizedSearch,
+        business_id: business.id
+        });
+
+        // Сначала точное совпадение
+        let { data: services } = await supabase
         .from('services')
-        .select('id')
+        .select('id, name')
         .eq('business_id', business.id)
-        .ilike('name', `%${serviceRequested}%`)
+        .ilike('name', normalizedSearch)
         .limit(1);
+
+        // Если не найдено - частичное совпадение
+        if (!services || services.length === 0) {
+        const { data: partialMatch } = await supabase
+            .from('services')
+            .select('id, name')
+            .eq('business_id', business.id)
+            .ilike('name', `%${normalizedSearch.split(' ')[0]}%`)
+            .limit(1);
+        
+        services = partialMatch;
+        }
 
         console.log('🔍 Service found:', {
             found: services?.length || 0,
@@ -132,7 +162,7 @@ export async function POST(request: Request) {
             service_id: services[0].id,
             booking_date: bookingDate,
             booking_time: bookingTime,
-            status: 'confirmed'
+            status: 'booked'
           });
 
         if (bookingError) {
