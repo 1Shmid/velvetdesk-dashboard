@@ -62,7 +62,7 @@ export async function createCalendarEvent(
     };
 
     const response = await calendar.events.insert({
-      calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+      calendarId: process.env.GOOGLE_CALENDAR_ID || '811e2b6c80d92b4312f5734955ea73eb07925cedc795b60be4b671f2ba935e3a@group.calendar.google.com',
       requestBody: event,
     });
 
@@ -109,7 +109,7 @@ export async function updateCalendarEvent(
     }
 
     await calendar.events.patch({
-      calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+      calendarId: process.env.GOOGLE_CALENDAR_ID || '811e2b6c80d92b4312f5734955ea73eb07925cedc795b60be4b671f2ba935e3a@group.calendar.google.com',
       eventId: eventId,
       requestBody: updateData,
     });
@@ -128,7 +128,7 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
     const calendar = getCalendarClient();
 
     await calendar.events.delete({
-      calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+      calendarId: process.env.GOOGLE_CALENDAR_ID || '811e2b6c80d92b4312f5734955ea73eb07925cedc795b60be4b671f2ba935e3a@group.calendar.google.com',
       eventId: eventId,
     });
 
