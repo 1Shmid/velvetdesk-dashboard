@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createCalendarEvent } from '@/lib/google-calendar';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -148,7 +149,7 @@ export async function POST(request: Request) {
         // Сначала точное совпадение
         let { data: services } = await supabase
         .from('services')
-        .select('id, name')
+        .select('id, name, duration')
         .eq('business_id', business.id)
         .ilike('name', normalizedSearch)
         .limit(1);
@@ -157,7 +158,7 @@ export async function POST(request: Request) {
         if (!services || services.length === 0) {
         const { data: partialMatch } = await supabase
             .from('services')
-            .select('id, name')
+            .select('id, name, duration')
             .eq('business_id', business.id)
             .ilike('name', `%${normalizedSearch.split(' ')[0]}%`)
             .limit(1);
@@ -173,15 +174,15 @@ export async function POST(request: Request) {
       if (services && services.length > 0) {
 
         console.log('✅ Creating booking:', {
-            customer_name: customerName,
-            service_id: services[0].id,
-            booking_date: bookingDate,
-            booking_time: bookingTime
-            });
+        customer_name: customerName,
+        service_id: services[0].id,
+        booking_date: bookingDate,
+        booking_time: bookingTime
+        });
 
-        const { error: bookingError } = await supabase
-          .from('bookings')
-          .insert({
+        const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
             business_id: business.id,
             call_id: savedCall.id,
             customer_name: customerName,
@@ -191,28 +192,58 @@ export async function POST(request: Request) {
             booking_date: parsedBookingDate,  // ✅ Используем преобразованную дату
             booking_time: bookingTime,
             status: 'booked'
-          });
+        })
+        .select()
+        .single();
 
         if (bookingError) {
-            console.error('❌ Booking error:', bookingError);
-            } else {
-            console.log('✅ Booking created successfully');
+        console.error('❌ Booking error:', bookingError);
+        } else {
+        console.log('✅ Booking created successfully');
 
-            // Обновляем summary с правильным названием сервиса из базы
-            const correctServiceName = services[0].name;
-            const updatedSummary = `Booking confirmed for ${customerName}, ${correctServiceName}, ${parsedBookingDate}, ${bookingTime}`;
+        // Обновляем summary с правильным названием сервиса из базы
+        const correctServiceName = services[0].name;
+        const updatedSummary = `Booking confirmed for ${customerName}, ${correctServiceName}, ${parsedBookingDate}, ${bookingTime}`;
 
-            await supabase
+        await supabase
             .from('calls')
             .update({ summary: updatedSummary })
             .eq('id', savedCall.id);
-            }
-      } else {
-        console.log('⚠️ Service not found:', serviceRequested);
-      }
-    }
 
-    return NextResponse.json({ success: true, call_id: savedCall.id });
+        // Sync with Google Calendar
+        if (booking) {
+            const calendarEventId = await createCalendarEvent({
+            service_name: correctServiceName,
+            customer_name: customerName,
+            booking_phone: bookingPhone,
+            customer_phone: customerPhone,
+            booking_date: parsedBookingDate,
+            booking_time: bookingTime,
+            duration: services[0].duration,
+            });
+
+            // Update booking with calendar_event_id
+            if (calendarEventId) {
+            await supabase
+                .from('bookings')
+                .update({
+                calendar_event_id: calendarEventId,
+                calendar_synced_at: new Date().toISOString(),
+                })
+                .eq('id', booking.id);
+
+            console.log(`✅ Booking ${booking.id} synced to calendar: ${calendarEventId}`);
+            } else {
+            console.log(`⚠️ Booking ${booking.id} created but calendar sync failed`);
+            }
+        }
+        }
+            } else {
+                console.log('⚠️ Service not found:', serviceRequested);
+            }
+            }
+
+            return NextResponse.json({ success: true, call_id: savedCall.id });
 
   } catch (error) {
     console.error('Webhook error:', error);
