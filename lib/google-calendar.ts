@@ -18,7 +18,7 @@ function getCalendarClient() {
   const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\\\n/g, '\n'),
+      private_key: process.env.GOOGLE_PRIVATE_KEY,
     },
     scopes: SCOPES,
   });
@@ -43,7 +43,8 @@ export async function createCalendarEvent(
 
     const calendar = getCalendarClient();
 
-    // Combine date and time into ISO format
+
+    // Combine date and time into ISO format 
     const startDateTime = `${eventData.booking_date}T${eventData.booking_time}:00`;
     
     // Calculate end time
