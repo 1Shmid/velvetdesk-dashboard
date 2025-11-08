@@ -31,6 +31,16 @@ export async function createCalendarEvent(
   eventData: CalendarEvent
 ): Promise<string | null> {
   try {
+
+    // Debug logging
+    console.log('🔍 Calendar API Debug:', {
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    calendarId: process.env.GOOGLE_CALENDAR_ID,
+    privateKeyExists: !!process.env.GOOGLE_PRIVATE_KEY,
+    privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length,
+    privateKeyStart: process.env.GOOGLE_PRIVATE_KEY?.substring(0, 50),
+    });
+
     const calendar = getCalendarClient();
 
     // Combine date and time into ISO format
@@ -68,10 +78,17 @@ export async function createCalendarEvent(
 
     console.log('✅ Calendar event created:', response.data.id);
     return response.data.id || null;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Calendar sync failed:', error);
+    console.error('📋 Error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        errors: error.errors,
+        response: error.response?.data,
+    });
     return null;
-  }
+    }
 }
 
 // Update calendar event (for future use)
