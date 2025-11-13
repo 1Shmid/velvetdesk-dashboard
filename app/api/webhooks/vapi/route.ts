@@ -39,14 +39,25 @@ export async function POST(request: Request) {
     const duration = Math.round(payload.message.durationSeconds || 0);
     const recordingUrl = payload.message.recordingUrl || '';
 
-    // Данные приходят в analysis.structuredData
-    const bookingData = payload.message?.analysis?.structuredData || {};
+    // Читаем из structuredOutputs (универсально для любого assistant)
+    const structuredOutputs = payload.message?.analysis?.structuredOutputs || {};
+    const outputKeys = Object.keys(structuredOutputs);
+    const bookingOutput = outputKeys.length > 0 ? structuredOutputs[outputKeys[0]]?.result : {};
 
-    const customerName      = bookingData.customer_name      || 'Unknown';
-    const serviceRequested  = bookingData.service_requested  || 'Unknown';
-    const bookingDate       = bookingData.booking_date       || '';
-    const bookingTime       = bookingData.booking_time       || '';
-    const outcome           = bookingData.outcome            || 'inquiry_only';
+    const bookingData = {
+      customer_name: bookingOutput.customer_name || 'Unknown',
+      customer_phone: bookingOutput.customer_phone || '',
+      service_requested: bookingOutput.service_requested || 'Unknown',
+      booking_date: bookingOutput.booking_date || '',
+      booking_time: bookingOutput.booking_time || '',
+      outcome: bookingOutput.outcome || 'inquiry_only'
+    };
+
+    const customerName = bookingData.customer_name;
+    const serviceRequested = bookingData.service_requested;
+    const bookingDate = bookingData.booking_date;
+    const bookingTime = bookingData.booking_time;
+    const outcome = bookingData.outcome;
     const customerPhone = call.customer?.number || '';  // С какого номера звонил
     const bookingPhone = bookingData.customer_phone || '';  // Какой назвал для записи
 
@@ -93,36 +104,15 @@ export async function POST(request: Request) {
         bookingTime
         });
 
-        // Преобразуем "mañana/tomorrow" в реальную дату
-        const parseBookingDate = (dateStr: string): string => {
-        const lowerDate = dateStr.toLowerCase();
-        const today = new Date();
-        
-        if (lowerDate.includes('mañana') || lowerDate.includes('tomorrow')) {
-            const tomorrow = new Date(today);
-            tomorrow.setDate(today.getDate() + 1);
-            return tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
-        }
-        
-        if (lowerDate.includes('hoy') || lowerDate.includes('today')) {
-            return today.toISOString().split('T')[0];
-        }
-        
-        // Если уже в формате даты - вернуть как есть
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-            return dateStr;
-        }
-        
-        // По умолчанию - завтра
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
-        };
-
-        const parsedBookingDate = parseBookingDate(bookingDate);
-
         // Исправляем дату если AI вернул прошлое
         const fixPastDate = (dateStr: string): string => {
+          // Если пустая строка или невалидная дата - возвращаем завтра
+          if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow.toISOString().split('T')[0];
+          }
+
           const bookingDate = new Date(dateStr);
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -137,7 +127,7 @@ export async function POST(request: Request) {
           return dateStr;
         };
 
-        const finalBookingDate = fixPastDate(parsedBookingDate);
+        const finalBookingDate = fixPastDate(bookingDate);
 
     // Создаём booking
     if (outcome === 'booked' && serviceRequested !== 'Unknown') {
@@ -221,7 +211,7 @@ export async function POST(request: Request) {
 
         // Обновляем summary с правильным названием сервиса из базы
         const correctServiceName = services[0].name;
-        const updatedSummary = `Booking confirmed for ${customerName}, ${correctServiceName}, ${parsedBookingDate}, ${bookingTime}`;
+        const updatedSummary = `Booking confirmed for ${customerName}, ${correctServiceName}, ${bookingDate}, ${bookingTime}`;
 
         await supabase
             .from('calls')
