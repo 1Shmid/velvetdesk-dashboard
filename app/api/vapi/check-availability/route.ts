@@ -6,32 +6,45 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-interface AvailabilityRequest {
-  business_id: string;
-  service_id: string;
-  booking_date: string; // YYYY-MM-DD
-  booking_time: string; // HH:MM
-}
-
-interface BookingSlot {
-  start: Date;
-  end: Date;
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': '*',
+};
 
 export async function POST(request: NextRequest) {
   try {
-    const body: AvailabilityRequest = await request.json();
-    const { business_id, service_id, booking_date, booking_time } = body;
+    const body = await request.json();
+    console.log('🔧 checkAvailability called:', JSON.stringify(body, null, 2));
 
-    // Validate input
-    if (!business_id || !service_id || !booking_date || !booking_time) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+    // Extract tool call ID (CRITICAL for VAPI)
+    const toolCallId = body.message?.toolCallList?.[0]?.id || 
+                       body.message?.toolCalls?.[0]?.id;
+    
+    // Extract parameters from VAPI function call
+    const params = body.message?.toolCallList?.[0]?.function?.arguments ||
+                   body.message?.toolCalls?.[0]?.function?.arguments;
+    
+    if (!params) {
+      console.error('❌ No parameters in request');
+      return NextResponse.json({
+        results: [{
+          toolCallId: toolCallId,
+          result: JSON.stringify({ 
+            available: false, 
+            reason: 'Missing parameters',
+            suggested_times: []
+          })
+        }]
+      }, { headers: corsHeaders });
     }
 
-    // 1. Get service duration
+    const { business_id, service_id, booking_date, booking_time } = 
+      typeof params === 'string' ? JSON.parse(params) : params;
+
+    console.log('📋 Checking availability:', { business_id, service_id, booking_date, booking_time });
+
+    // Get service duration
     const { data: service, error: serviceError } = await supabase
       .from('services')
       .select('duration')
@@ -40,125 +53,157 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (serviceError || !service) {
-      return NextResponse.json(
-        { error: 'Service not found' },
-        { status: 404 }
-      );
+      console.error('❌ Service not found:', serviceError);
+      return NextResponse.json({
+        results: [{
+          toolCallId: toolCallId,
+          result: JSON.stringify({ 
+            available: false,
+            reason: 'Service not found',
+            suggested_times: []
+          })
+        }]
+      }, { headers: corsHeaders });
     }
 
-    // 2. Calculate end time
+    // Calculate end time
     const requestedStart = new Date(`${booking_date}T${booking_time}:00`);
     const requestedEnd = new Date(requestedStart.getTime() + service.duration * 60000);
 
-    // 3. Get all bookings for this date
+    // Get all services for this business (to map durations)
+    const { data: allServices } = await supabase
+      .from('services')
+      .select('id, duration')
+      .eq('business_id', business_id);
+
+    const serviceDurationMap = new Map(
+      allServices?.map(s => [s.id, s.duration]) || []
+    );
+
+    // Get all bookings for this date
     const { data: existingBookings, error: bookingsError } = await supabase
       .from('bookings')
-      .select('booking_time, service_id, services(duration)')
+      .select('booking_time, service_id')
       .eq('business_id', business_id)
       .eq('booking_date', booking_date)
       .eq('status', 'booked');
 
     if (bookingsError) {
-      console.error('Error fetching bookings:', bookingsError);
-      return NextResponse.json(
-        { error: 'Failed to check availability' },
-        { status: 500 }
-      );
+      console.error('❌ Error fetching bookings:', bookingsError);
     }
 
-    // 4. Check for overlaps
+    console.log('📅 Existing bookings:', existingBookings?.length || 0);
+
+    // Check for overlaps
     let hasOverlap = false;
     
     if (existingBookings && existingBookings.length > 0) {
       for (const booking of existingBookings) {
+        const bookingDuration = serviceDurationMap.get(booking.service_id) || 30;
         const bookingStart = new Date(`${booking_date}T${booking.booking_time}`);
-        const bookingDuration = (booking.services as any)?.duration || 30;
         const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
 
-        // Check overlap: (StartA < EndB) AND (EndA > StartB)
         if (requestedStart < bookingEnd && requestedEnd > bookingStart) {
           hasOverlap = true;
+          console.log('❌ Overlap detected:', { 
+            existing: booking.booking_time, 
+            requested: booking_time 
+          });
           break;
         }
       }
     }
 
-    // 5. If available, return success
+    // If available
     if (!hasOverlap) {
+      console.log('✅ Time slot available');
       return NextResponse.json({
-        available: true,
-        booking_time,
-        message: 'Time slot is available'
-      });
+        results: [{
+          toolCallId: toolCallId,
+          result: JSON.stringify({
+            available: true,
+            booking_time: booking_time,
+            message: 'Horario disponible'
+          })
+        }]
+      }, { headers: corsHeaders });
     }
 
-    // 6. If not available, find alternative slots
-    const { data: workingHours, error: hoursError } = await supabase
+    // If not available, find alternatives
+    const { data: workingHours } = await supabase
       .from('working_hours')
-      .select('start_time, end_time')
+      .select('open_time, close_time')
       .eq('business_id', business_id)
       .eq('day_of_week', new Date(booking_date).getDay())
       .single();
 
-    if (hoursError || !workingHours) {
-      return NextResponse.json({
-        available: false,
-        reason: 'No working hours configured for this day',
-        suggested_times: []
-      });
-    }
-
-    // Generate time slots (every 30 minutes within working hours)
     const suggestedTimes: string[] = [];
-    const workStart = new Date(`${booking_date}T${workingHours.start_time}`);
-    const workEnd = new Date(`${booking_date}T${workingHours.end_time}`);
     
-    let currentSlot = new Date(workStart);
-    
-    while (currentSlot < workEnd && suggestedTimes.length < 3) {
-      const slotEnd = new Date(currentSlot.getTime() + service.duration * 60000);
+    if (workingHours) {
+      const workStart = new Date(`${booking_date}T${workingHours.open_time}`);
+      const workEnd = new Date(`${booking_date}T${workingHours.close_time}`);
+      let currentSlot = new Date(workStart);
       
-      // Skip if slot extends beyond working hours
-      if (slotEnd > workEnd) break;
-      
-      // Check if this slot is free
-      let isFree = true;
-      if (existingBookings) {
-        for (const booking of existingBookings) {
-          const bookingStart = new Date(`${booking_date}T${booking.booking_time}`);
-          const bookingDuration = (booking.services as any)?.duration || 30;
-          const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
+      while (currentSlot < workEnd && suggestedTimes.length < 3) {
+        const slotEnd = new Date(currentSlot.getTime() + service.duration * 60000);
+        if (slotEnd > workEnd) break;
+        
+        let isFree = true;
+        if (existingBookings) {
+          for (const booking of existingBookings) {
+            const bookingDuration = serviceDurationMap.get(booking.service_id) || 30;
+            const bookingStart = new Date(`${booking_date}T${booking.booking_time}`);
+            const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
 
-          if (currentSlot < bookingEnd && slotEnd > bookingStart) {
-            isFree = false;
-            break;
+            if (currentSlot < bookingEnd && slotEnd > bookingStart) {
+              isFree = false;
+              break;
+            }
           }
         }
+        
+        if (isFree) {
+          suggestedTimes.push(currentSlot.toTimeString().slice(0, 5));
+        }
+        
+        currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
       }
-      
-      if (isFree) {
-        const timeStr = currentSlot.toTimeString().slice(0, 5);
-        suggestedTimes.push(timeStr);
-      }
-      
-      // Move to next 30-minute slot
-      currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
     }
 
+    console.log('❌ Time slot occupied. Suggestions:', suggestedTimes);
+
     return NextResponse.json({
-      available: false,
-      reason: 'Time slot is already booked',
-      suggested_times: suggestedTimes,
-      message: suggestedTimes.length > 0 
-        ? `Lo siento, esa hora está ocupada. Tengo disponible a las ${suggestedTimes.join(', ')}`
-        : 'No hay horarios disponibles para ese día'
-    });
+      results: [{
+        toolCallId: toolCallId,
+        result: JSON.stringify({
+          available: false,
+          reason: 'Horario ocupado',
+          suggested_times: suggestedTimes,
+          message: suggestedTimes.length > 0 
+            ? `Lo siento, esa hora está ocupada. Tengo disponible a las ${suggestedTimes.join(', ')}`
+            : 'No hay horarios disponibles para ese día'
+        })
+      }]
+    }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('Error in check-availability:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('❌ checkAvailability error:', error);
+    const body = await request.json().catch(() => ({}));
+    const toolCallId = body.message?.toolCallList?.[0]?.id;
+    
+    return NextResponse.json({
+      results: [{
+        toolCallId: toolCallId,
+        result: JSON.stringify({ 
+          available: false,
+          reason: 'Error interno',
+          suggested_times: []
+        })
+      }]
+    }, { headers: corsHeaders });
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: corsHeaders });
 }
