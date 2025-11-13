@@ -58,17 +58,17 @@ export async function POST(request: Request) {
     const bookingDate = bookingData.booking_date;
     const bookingTime = bookingData.booking_time;
     const outcome = bookingData.outcome;
-    const customerPhone = call.customer?.number || '';  // С какого номера звонил
-    const bookingPhone = bookingData.customer_phone || '';  // Какой назвал для записи
+    const customerPhone = call.customer?.number || '';
+    const bookingPhone = bookingData.customer_phone || '';
 
     // Формируем summary на основе outcome
     let enhancedSummary = '';
     if (outcome === 'booked') {
-    enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}${bookingDate ? ', ' + bookingDate : ''}${bookingTime ? ', ' + bookingTime : ''}`;
+      enhancedSummary = `Booking confirmed for ${customerName}, ${serviceRequested}${bookingDate ? ', ' + bookingDate : ''}${bookingTime ? ', ' + bookingTime : ''}`;
     } else if (outcome === 'cancelled') {
-    enhancedSummary = `Booking cancelled by ${customerName}`;
+      enhancedSummary = `Booking cancelled by ${customerName}`;
     } else {
-    enhancedSummary = `Inquiry about ${serviceRequested} by ${customerName}`;
+      enhancedSummary = `Inquiry about ${serviceRequested} by ${customerName}`;
     }
 
     const { data: savedCall, error: callError } = await supabase
@@ -77,8 +77,8 @@ export async function POST(request: Request) {
         business_id: business.id,
         vapi_call_id: call.id,
         customer_name: customerName,
-        customer_phone: customerPhone,  // С какого звонил
-        booking_phone: bookingPhone,    // Назвал для записи
+        customer_phone: customerPhone,
+        booking_phone: bookingPhone,
         duration: duration,
         status: outcome === 'booked' ? 'booked' : 'missed',
         summary: enhancedSummary,
@@ -97,161 +97,236 @@ export async function POST(request: Request) {
     console.log('✅ Call saved:', savedCall.id);
 
     console.log('🔍 Booking check:', {
-        outcome,
-        serviceRequested,
-        customerName,
-        bookingDate,
-        bookingTime
-        });
+      outcome,
+      serviceRequested,
+      customerName,
+      bookingDate,
+      bookingTime
+    });
 
-        // Исправляем дату если AI вернул прошлое
-        const fixPastDate = (dateStr: string): string => {
-          // Если пустая строка или невалидная дата - возвращаем завтра
-          if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            return tomorrow.toISOString().split('T')[0];
-          }
-
-          const bookingDate = new Date(dateStr);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+    // Парсинг даты из дней недели
+    const parseBookingDate = (dateStr: string): string => {
+      const lowerDate = dateStr.toLowerCase();
+      const today = new Date();
+      
+      // Дни недели
+      const weekdays: { [key: string]: number } = {
+        'lunes': 1, 'monday': 1,
+        'martes': 2, 'tuesday': 2,
+        'miércoles': 3, 'miercoles': 3, 'wednesday': 3,
+        'jueves': 4, 'thursday': 4,
+        'viernes': 5, 'friday': 5,
+        'sábado': 6, 'sabado': 6, 'saturday': 6,
+        'domingo': 0, 'sunday': 0
+      };
+      
+      // Проверяем день недели
+      for (const [day, targetDay] of Object.entries(weekdays)) {
+        if (lowerDate.includes(day)) {
+          const currentDay = today.getDay();
+          let daysUntil = targetDay - currentDay;
+          if (daysUntil <= 0) daysUntil += 7;
           
-          // Если дата в прошлом, добавляем 7 дней
-          if (bookingDate < today) {
-            bookingDate.setDate(bookingDate.getDate() + 7);
-            console.log(`📅 Date was in past, moved forward: ${dateStr} → ${bookingDate.toISOString().split('T')[0]}`);
-            return bookingDate.toISOString().split('T')[0];
-          }
-          
-          return dateStr;
-        };
+          const result = new Date(today);
+          result.setDate(today.getDate() + daysUntil);
+          return result.toISOString().split('T')[0];
+        }
+      }
+      
+      if (lowerDate.includes('mañana') || lowerDate.includes('tomorrow')) {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+      }
+      
+      if (lowerDate.includes('hoy') || lowerDate.includes('today')) {
+        return today.toISOString().split('T')[0];
+      }
+      
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      return tomorrow.toISOString().split('T')[0];
+    };
 
-        const finalBookingDate = fixPastDate(bookingDate);
+    // Парсинг времени
+    const parseBookingTime = (timeStr: string): string => {
+      const lowerTime = timeStr.toLowerCase();
+      
+      // "3 de la tarde" → 15:00
+      const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
+      if (afternoonMatch) {
+        const hour = parseInt(afternoonMatch[1]);
+        return `${hour === 12 ? 12 : hour + 12}:00`;
+      }
+      
+      // "10 de la mañana" → 10:00
+      const morningMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*mañana|am)/);
+      if (morningMatch) {
+        const hour = parseInt(morningMatch[1]);
+        return `${hour.toString().padStart(2, '0')}:00`;
+      }
+      
+      // Уже HH:MM
+      if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
+        const [h, m] = timeStr.split(':');
+        return `${h.padStart(2, '0')}:${m}`;
+      }
+      
+      return '10:00';
+    };
+
+    const parsedDate = parseBookingDate(bookingDate);
+    const parsedTime = parseBookingTime(bookingTime);
+
+    // Исправляем дату если в прошлом
+    const fixPastDate = (dateStr: string): string => {
+      if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+      }
+
+      const bookingDate = new Date(dateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (bookingDate < today) {
+        bookingDate.setDate(bookingDate.getDate() + 7);
+        console.log(`📅 Date was in past, moved forward: ${dateStr} → ${bookingDate.toISOString().split('T')[0]}`);
+        return bookingDate.toISOString().split('T')[0];
+      }
+      
+      return dateStr;
+    };
+
+    const finalBookingDate = fixPastDate(parsedDate);
+    const finalBookingTime = parsedTime;
 
     // Создаём booking
     if (outcome === 'booked' && serviceRequested !== 'Unknown') {
-
-        console.log('🔍 Service search:', {
-            searchTerm: serviceRequested,
-            business_id: business.id
-        });
+      console.log('🔍 Service search:', {
+        searchTerm: serviceRequested,
+        business_id: business.id
+      });
 
       // Нормализация для поиска
-        const normalizeService = (name: string) => {
+      const normalizeService = (name: string) => {
         return name
-            .toLowerCase()
-            .replace(/corte de pelo/gi, 'corte de cabello')
-            .replace(/tinte de pelo/gi, 'tinte y coloración')
-            .trim();
-        };
+          .toLowerCase()
+          .replace(/corte de pelo/gi, 'corte de cabello')
+          .replace(/tinte de pelo/gi, 'tinte y coloración')
+          .trim();
+      };
 
-        const normalizedSearch = normalizeService(serviceRequested);
+      const normalizedSearch = normalizeService(serviceRequested);
 
-        console.log('🔍 Service search:', {
+      console.log('🔍 Service search:', {
         original: serviceRequested,
         normalized: normalizedSearch,
         business_id: business.id
-        });
+      });
 
-        // Сначала точное совпадение
-        let { data: services } = await supabase
+      // Сначала точное совпадение
+      let { data: services } = await supabase
         .from('services')
         .select('id, name, duration')
         .eq('business_id', business.id)
         .ilike('name', normalizedSearch)
         .limit(1);
 
-        // Если не найдено - частичное совпадение
-        if (!services || services.length === 0) {
+      // Если не найдено - частичное совпадение
+      if (!services || services.length === 0) {
         const { data: partialMatch } = await supabase
-            .from('services')
-            .select('id, name, duration')
-            .eq('business_id', business.id)
-            .ilike('name', `%${normalizedSearch.split(' ')[0]}%`)
-            .limit(1);
+          .from('services')
+          .select('id, name, duration')
+          .eq('business_id', business.id)
+          .ilike('name', `%${normalizedSearch.split(' ')[0]}%`)
+          .limit(1);
         
         services = partialMatch;
-        }
+      }
 
-        console.log('🔍 Service found:', {
-            found: services?.length || 0,
-            serviceId: services?.[0]?.id
-        });
+      console.log('🔍 Service found:', {
+        found: services?.length || 0,
+        serviceId: services?.[0]?.id
+      });
 
       if (services && services.length > 0) {
-
         console.log('✅ Creating booking:', {
-        customer_name: customerName,
-        service_id: services[0].id,
-        booking_date: bookingDate,
-        booking_time: bookingTime
+          customer_name: customerName,
+          service_id: services[0].id,
+          booking_date: finalBookingDate,
+          booking_time: finalBookingTime
         });
 
         const { data: booking, error: bookingError } = await supabase
-        .from('bookings')
-        .insert({
+          .from('bookings')
+          .insert({
             business_id: business.id,
             call_id: savedCall.id,
             customer_name: customerName,
-            customer_phone: customerPhone,  // С какого звонил
-            booking_phone: bookingPhone,    // Для связи
+            customer_phone: customerPhone,
+            booking_phone: bookingPhone,
             service_id: services[0].id,
-            booking_date: finalBookingDate,  // Вместо parsedBookingDate
-            booking_time: bookingTime,
+            booking_date: finalBookingDate,
+            booking_time: finalBookingTime,
             status: 'booked'
-        })
-        .select()
-        .single();
+          })
+          .select()
+          .single();
 
         if (bookingError) {
-        console.error('❌ Booking error:', bookingError);
+          console.error('❌ Booking error:', bookingError);
         } else {
-        console.log('✅ Booking created successfully');
+          console.log('✅ Booking created successfully');
 
-        // Обновляем summary с правильным названием сервиса из базы
-        const correctServiceName = services[0].name;
-        const updatedSummary = `Booking confirmed for ${customerName}, ${correctServiceName}, ${bookingDate}, ${bookingTime}`;
+          // Обновляем summary с правильным названием сервиса из базы
+          const correctServiceName = services[0].name;
+          const updatedSummary = `Booking confirmed for ${customerName}, ${correctServiceName}, ${finalBookingDate}, ${finalBookingTime}`;
 
-        await supabase
+          await supabase
             .from('calls')
             .update({ summary: updatedSummary })
             .eq('id', savedCall.id);
 
-        // Sync with Google Calendar
-        if (booking) {
+          // Sync with Google Calendar
+          if (booking) {
             const calendarEventId = await createCalendarEvent({
-            service_name: correctServiceName,
-            customer_name: customerName,
-            booking_phone: bookingPhone,
-            customer_phone: customerPhone,
-            booking_date: finalBookingDate,  // Вместо parsedBookingDate
-            booking_time: bookingTime,
-            duration: services[0].duration,
+              service_name: correctServiceName,
+              customer_name: customerName,
+              booking_phone: bookingPhone,
+              customer_phone: customerPhone,
+              booking_date: finalBookingDate,
+              booking_time: finalBookingTime,
+              duration: services[0].duration,
             });
 
             // Update booking with calendar_event_id
             if (calendarEventId) {
-            await supabase
+              await supabase
                 .from('bookings')
                 .update({
-                calendar_event_id: calendarEventId,
-                calendar_synced_at: new Date().toISOString(),
+                  calendar_event_id: calendarEventId,
+                  calendar_synced_at: new Date().toISOString(),
                 })
                 .eq('id', booking.id);
 
-            console.log(`✅ Booking ${booking.id} synced to calendar: ${calendarEventId}`);
+              console.log(`✅ Booking ${booking.id} synced to calendar: ${calendarEventId}`);
             } else {
-            console.log(`⚠️ Booking ${booking.id} created but calendar sync failed`);
+              console.log(`⚠️ Booking ${booking.id} created but calendar sync failed`);
             }
+          }
         }
-        }
-            } else {
-                console.log('⚠️ Service not found:', serviceRequested);
-            }
-            }
+      } else {
+        console.log('⚠️ Service not found:', serviceRequested);
+      }
+    }
 
-            return NextResponse.json({ success: true, call_id: savedCall.id });
+    return NextResponse.json({ success: true, call_id: savedCall.id });
 
   } catch (error) {
     console.error('Webhook error:', error);
