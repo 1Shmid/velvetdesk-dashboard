@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const { data: services } = await supabase
       .from('services')
-      .select('name, price, duration')
+      .select('id, name, price, duration')
       .eq('business_id', business.id)
       .eq('is_active', true);
 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       .eq('is_closed', false);
 
     const servicesText = services?.map(s => 
-      `${s.name}: €${s.price}, ${s.duration} minutos`
+      `${s.name} (ID: ${s.id}): €${s.price}, ${s.duration} minutos`
     ).join('; ') || 'Sin servicios';
 
     const hoursText = hours?.map(h => 
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       results: [
         {
           toolCallId: toolCallId,
-          result: `Servicios: ${servicesText}. Horario: ${hoursText}`
+          result: `Business ID: ${business.id}. Servicios: ${servicesText}. Horario: ${hoursText}`
         }
       ]
     }, { headers: corsHeaders });
