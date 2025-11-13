@@ -10,6 +10,9 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
+
+    console.log('🔍 Full analysis:', JSON.stringify(payload.message?.analysis, null, 2));
+    console.log('🔍 StructuredOutputs:', JSON.stringify(payload.message?.analysis?.structuredOutputs, null, 2));
     
     console.log('VAPI Webhook received:', JSON.stringify(payload, null, 2));
 
