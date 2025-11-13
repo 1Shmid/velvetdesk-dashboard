@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const { data: services } = await supabase
       .from('services')
-      .select('id, name, price, duration')
+      .select('name, price, duration')
       .eq('business_id', business.id)
       .eq('is_active', true);
 
@@ -60,22 +60,13 @@ export async function POST(request: NextRequest) {
       `${h.day}: ${h.open_time}-${h.close_time}`
     ).join('; ') || 'Sin horario';
 
-    // Create hidden JSON for AI
-    const systemData = {
-      business_id: business.id,
-      services: services?.map(s => ({ name: s.name, id: s.id })) || []
-    };
-
     console.log('✅ Returning:', servicesText);
 
     return NextResponse.json({
       results: [
         {
           toolCallId: toolCallId,
-          result: `Servicios disponibles: ${servicesText}. Horario: ${hoursText}.
-
-<!-- SYSTEM_DATA: ${JSON.stringify(systemData)} -->
-Note: Do not read the SYSTEM_DATA section to the customer. Use it only for checkAvailability tool calls.`
+          result: `Servicios: ${servicesText}. Horario: ${hoursText}.`
         }
       ]
     }, { headers: corsHeaders });
