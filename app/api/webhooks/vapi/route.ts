@@ -121,6 +121,24 @@ export async function POST(request: Request) {
 
         const parsedBookingDate = parseBookingDate(bookingDate);
 
+        // Исправляем дату если AI вернул прошлое
+        const fixPastDate = (dateStr: string): string => {
+          const bookingDate = new Date(dateStr);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // Если дата в прошлом, добавляем 7 дней
+          if (bookingDate < today) {
+            bookingDate.setDate(bookingDate.getDate() + 7);
+            console.log(`📅 Date was in past, moved forward: ${dateStr} → ${bookingDate.toISOString().split('T')[0]}`);
+            return bookingDate.toISOString().split('T')[0];
+          }
+          
+          return dateStr;
+        };
+
+        const finalBookingDate = fixPastDate(parsedBookingDate);
+
     // Создаём booking
     if (outcome === 'booked' && serviceRequested !== 'Unknown') {
 
@@ -189,7 +207,7 @@ export async function POST(request: Request) {
             customer_phone: customerPhone,  // С какого звонил
             booking_phone: bookingPhone,    // Для связи
             service_id: services[0].id,
-            booking_date: parsedBookingDate,  // ✅ Используем преобразованную дату
+            booking_date: finalBookingDate,  // Вместо parsedBookingDate
             booking_time: bookingTime,
             status: 'booked'
         })
@@ -217,7 +235,7 @@ export async function POST(request: Request) {
             customer_name: customerName,
             booking_phone: bookingPhone,
             customer_phone: customerPhone,
-            booking_date: parsedBookingDate,
+            booking_date: finalBookingDate,  // Вместо parsedBookingDate
             booking_time: bookingTime,
             duration: services[0].duration,
             });
