@@ -152,7 +152,7 @@ export async function POST(request: Request) {
 
     // Парсинг времени
     const parseBookingTime = (timeStr: string): string => {
-      const lowerTime = timeStr.toLowerCase();
+      const lowerTime = timeStr.toLowerCase().trim();
       
       // "3 de la tarde" → 15:00
       const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
@@ -174,7 +174,18 @@ export async function POST(request: Request) {
         return `${h.padStart(2, '0')}:${m}`;
       }
       
-      return '10:00';
+      // "las 12", "a las 12", "12" → 12:00
+      const hourOnlyMatch = lowerTime.match(/(?:las\s+)?(\d{1,2})(?!\s*:)/);
+      if (hourOnlyMatch) {
+        const hour = parseInt(hourOnlyMatch[1]);
+        if (hour >= 0 && hour <= 23) {
+          return `${hour.toString().padStart(2, '0')}:00`;
+        }
+      }
+      
+      // Если ничего не распарсилось - логируем и возвращаем null
+      console.error('⚠️ Failed to parse time:', timeStr);
+      return '';
     };
 
     const parsedDate = parseBookingDate(bookingDate);
