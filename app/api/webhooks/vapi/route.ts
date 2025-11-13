@@ -10,9 +10,6 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
-
-    console.log('🔍 Full analysis:', JSON.stringify(payload.message?.analysis, null, 2));
-    console.log('🔍 StructuredOutputs:', JSON.stringify(payload.message?.analysis?.structuredOutputs, null, 2));
     
     console.log('VAPI Webhook received:', JSON.stringify(payload, null, 2));
 
@@ -42,10 +39,8 @@ export async function POST(request: Request) {
     const duration = Math.round(payload.message.durationSeconds || 0);
     const recordingUrl = payload.message.recordingUrl || '';
 
-    // Читаем из structuredOutputs (универсально для любого assistant)
-    const structuredOutputs = payload.message?.analysis?.structuredOutputs || {};
-    const outputKeys = Object.keys(structuredOutputs);
-    const bookingOutput = outputKeys.length > 0 ? structuredOutputs[outputKeys[0]]?.result : {};
+    // Читаем из structuredData (универсально)
+    const bookingOutput = payload.message?.analysis?.structuredData || {};
 
     const bookingData = {
       customer_name: bookingOutput.customer_name || 'Unknown',
