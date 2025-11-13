@@ -17,11 +17,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('🔧 checkAvailability called:', JSON.stringify(body, null, 2));
 
-    // Extract tool call ID (CRITICAL for VAPI)
+    // Extract tool call ID
     const toolCallId = body.message?.toolCallList?.[0]?.id || 
                        body.message?.toolCalls?.[0]?.id;
     
-    // Extract parameters from VAPI function call
+    // Extract parameters
     const params = body.message?.toolCallList?.[0]?.function?.arguments ||
                    body.message?.toolCalls?.[0]?.function?.arguments;
     
@@ -39,17 +39,41 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
-    const { business_id, service_id, booking_date, booking_time } = 
+    const { service_name, booking_date, booking_time } = 
       typeof params === 'string' ? JSON.parse(params) : params;
 
-    console.log('📋 Checking availability:', { business_id, service_id, booking_date, booking_time });
+    console.log('📋 Checking availability:', { service_name, booking_date, booking_time });
 
-    // Get service duration
+    // Get assistant_id from call context
+    const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2';
+
+    // Find business by assistant_id
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('vapi_assistant_id', assistantId)
+      .single();
+
+    if (!business) {
+      console.error('❌ Business not found');
+      return NextResponse.json({
+        results: [{
+          toolCallId: toolCallId,
+          result: JSON.stringify({ 
+            available: false,
+            reason: 'Business not found',
+            suggested_times: []
+          })
+        }]
+      }, { headers: corsHeaders });
+    }
+
+    // Find service by name (case-insensitive, trim spaces)
     const { data: service, error: serviceError } = await supabase
       .from('services')
-      .select('duration')
-      .eq('id', service_id)
-      .eq('business_id', business_id)
+      .select('id, duration')
+      .eq('business_id', business.id)
+      .ilike('name', service_name.trim())
       .single();
 
     if (serviceError || !service) {
@@ -66,6 +90,8 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
+    console.log('✅ Found service:', { id: service.id, duration: service.duration });
+
     // Calculate end time
     const requestedStart = new Date(`${booking_date}T${booking_time}:00`);
     const requestedEnd = new Date(requestedStart.getTime() + service.duration * 60000);
@@ -74,7 +100,7 @@ export async function POST(request: NextRequest) {
     const { data: allServices } = await supabase
       .from('services')
       .select('id, duration')
-      .eq('business_id', business_id);
+      .eq('business_id', business.id);
 
     const serviceDurationMap = new Map(
       allServices?.map(s => [s.id, s.duration]) || []
@@ -84,7 +110,7 @@ export async function POST(request: NextRequest) {
     const { data: existingBookings, error: bookingsError } = await supabase
       .from('bookings')
       .select('booking_time, service_id')
-      .eq('business_id', business_id)
+      .eq('business_id', business.id)
       .eq('booking_date', booking_date)
       .eq('status', 'booked');
 
@@ -133,7 +159,7 @@ export async function POST(request: NextRequest) {
     const { data: workingHours } = await supabase
       .from('working_hours')
       .select('open_time, close_time')
-      .eq('business_id', business_id)
+      .eq('business_id', business.id)
       .eq('day_of_week', new Date(booking_date).getDay())
       .single();
 
