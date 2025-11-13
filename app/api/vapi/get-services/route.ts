@@ -53,12 +53,18 @@ export async function POST(request: NextRequest) {
       .eq('is_closed', false);
 
     const servicesText = services?.map(s => 
-      `${s.name} (ID: ${s.id}): €${s.price}, ${s.duration} minutos`
+      `${s.name}: €${s.price}, ${s.duration} minutos`
     ).join('; ') || 'Sin servicios';
 
     const hoursText = hours?.map(h => 
       `${h.day}: ${h.open_time}-${h.close_time}`
     ).join('; ') || 'Sin horario';
+
+    // Create hidden JSON for AI
+    const systemData = {
+      business_id: business.id,
+      services: services?.map(s => ({ name: s.name, id: s.id })) || []
+    };
 
     console.log('✅ Returning:', servicesText);
 
@@ -66,7 +72,10 @@ export async function POST(request: NextRequest) {
       results: [
         {
           toolCallId: toolCallId,
-          result: `Business ID: ${business.id}. Servicios: ${servicesText}. Horario: ${hoursText}`
+          result: `Servicios disponibles: ${servicesText}. Horario: ${hoursText}.
+
+<!-- SYSTEM_DATA: ${JSON.stringify(systemData)} -->
+Note: Do not read the SYSTEM_DATA section to the customer. Use it only for checkAvailability tool calls.`
         }
       ]
     }, { headers: corsHeaders });
