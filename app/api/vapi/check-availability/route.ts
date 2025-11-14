@@ -12,10 +12,110 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': '*',
 };
 
+// Spanish weekday mapping
+const SPANISH_WEEKDAYS: { [key: string]: number } = {
+  'domingo': 0,
+  'lunes': 1,
+  'martes': 2,
+  'miércoles': 3,
+  'miercoles': 3, // without accent
+  'jueves': 4,
+  'viernes': 5,
+  'sábado': 6,
+  'sabado': 6 // without accent
+};
+
+// English weekday mapping (for working_hours table)
+const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/**
+ * Calculate next occurrence of a weekday
+ * @param weekdayStr - Spanish weekday (e.g., "lunes") or YYYY-MM-DD
+ * @returns YYYY-MM-DD date string
+ */
+function calculateDate(weekdayStr: string): string {
+  console.log('📅 calculateDate input:', weekdayStr);
+  
+  // If already in YYYY-MM-DD format, return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(weekdayStr)) {
+    console.log('✅ Already formatted date:', weekdayStr);
+    return weekdayStr;
+  }
+
+  const normalized = weekdayStr.toLowerCase().trim();
+  const targetDay = SPANISH_WEEKDAYS[normalized];
+
+  if (targetDay === undefined) {
+    console.error('❌ Unknown weekday:', weekdayStr);
+    return new Date().toISOString().split('T')[0]; // fallback to today
+  }
+
+  const today = new Date();
+  const currentDay = today.getDay();
+  
+  let daysUntil = targetDay - currentDay;
+  if (daysUntil <= 0) daysUntil += 7; // next week
+  
+  const targetDate = new Date(today);
+  targetDate.setDate(today.getDate() + daysUntil);
+  
+  const result = targetDate.toISOString().split('T')[0];
+  console.log(`✅ "${weekdayStr}" → ${result} (in ${daysUntil} days)`);
+  
+  return result;
+}
+
+/**
+ * Convert time to HH:MM format
+ * @param timeStr - "12", "15:00", "3 de la tarde"
+ * @returns HH:MM string
+ */
+function normalizeTime(timeStr: string): string {
+  console.log('🕐 normalizeTime input:', timeStr);
+  
+  // Already in HH:MM format
+  if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
+    console.log('✅ Already formatted time:', timeStr);
+    return timeStr.padStart(5, '0');
+  }
+
+  const lowerTime = timeStr.toLowerCase().trim();
+
+  // Handle "3 de la tarde" / "12 de la mañana"
+  const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
+  if (afternoonMatch) {
+    const hour = parseInt(afternoonMatch[1]);
+    const result = `${hour === 12 ? 12 : hour + 12}:00`;
+    console.log(`✅ "${timeStr}" → ${result}`);
+    return result;
+  }
+
+  const morningMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*mañana|am)/);
+  if (morningMatch) {
+    const hour = parseInt(morningMatch[1]);
+    const result = `${hour.toString().padStart(2, '0')}:00`;
+    console.log(`✅ "${timeStr}" → ${result}`);
+    return result;
+  }
+
+  // Just a number (e.g., "12")
+  const numberMatch = lowerTime.match(/^\d+$/);
+  if (numberMatch) {
+    const hour = parseInt(lowerTime);
+    const result = `${hour.toString().padStart(2, '0')}:00`;
+    console.log(`✅ "${timeStr}" → ${result}`);
+    return result;
+  }
+
+  console.error('❌ Could not parse time:', timeStr);
+  return '12:00'; // fallback
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('🔧 checkAvailability called:', JSON.stringify(body, null, 2));
+    console.log('\n🔧 ===== checkAvailability called =====');
+    console.log('📥 Raw request:', JSON.stringify(body, null, 2));
 
     // Extract tool call ID
     const toolCallId = body.message?.toolCallList?.[0]?.id || 
@@ -39,10 +139,21 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
-    const { service_name, booking_date, booking_time } = 
-      typeof params === 'string' ? JSON.parse(params) : params;
+    const rawParams = typeof params === 'string' ? JSON.parse(params) : params;
+    console.log('📋 Raw parameters:', rawParams);
 
-    console.log('📋 Checking availability:', { service_name, booking_date, booking_time });
+    const { service_name, booking_date, booking_time } = rawParams;
+
+    // Calculate actual date and normalize time
+    const actualDate = calculateDate(booking_date);
+    const actualTime = normalizeTime(booking_time);
+
+    console.log('✨ Processed:', { 
+      service_name, 
+      actualDate, 
+      actualTime,
+      original: { booking_date, booking_time }
+    });
 
     // Get assistant_id from call context
     const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2';
@@ -55,7 +166,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!business) {
-      console.error('❌ Business not found');
+      console.error('❌ Business not found for assistant:', assistantId);
       return NextResponse.json({
         results: [{
           toolCallId: toolCallId,
@@ -68,16 +179,18 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
+    console.log('🏢 Business ID:', business.id);
+
     // Find service by name (case-insensitive, trim spaces)
     const { data: service, error: serviceError } = await supabase
       .from('services')
-      .select('id, duration')
+      .select('id, name, duration')
       .eq('business_id', business.id)
       .ilike('name', service_name.trim())
       .single();
 
     if (serviceError || !service) {
-      console.error('❌ Service not found:', serviceError);
+      console.error('❌ Service not found:', { service_name, error: serviceError });
       return NextResponse.json({
         results: [{
           toolCallId: toolCallId,
@@ -90,11 +203,69 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
-    console.log('✅ Found service:', { id: service.id, duration: service.duration });
+    console.log('✅ Found service:', { id: service.id, name: service.name, duration: service.duration });
+
+    // Check working hours
+    const targetDate = new Date(actualDate);
+    const dayOfWeek = WEEKDAY_NAMES[targetDate.getDay()];
+    
+    console.log('📅 Checking working hours for:', { actualDate, dayOfWeek });
+
+    const { data: workingHours, error: hoursError } = await supabase
+      .from('working_hours')
+      .select('day, is_closed, open_time, close_time')
+      .eq('business_id', business.id)
+      .eq('day', dayOfWeek)
+      .single();
+
+    console.log('⏰ Working hours:', workingHours);
+
+    if (hoursError || !workingHours || workingHours.is_closed) {
+      console.error('❌ Salon closed on this day:', { dayOfWeek, error: hoursError });
+      return NextResponse.json({
+        results: [{
+          toolCallId: toolCallId,
+          result: JSON.stringify({
+            available: false,
+            reason: 'Salon closed',
+            actual_date: actualDate,
+            message: 'Lo siento, el salón está cerrado ese día'
+          })
+        }]
+      }, { headers: corsHeaders });
+    }
+
+    // Check if requested time is within working hours
+    const requestedTime = actualTime;
+    const openTime = workingHours.open_time.slice(0, 5); // HH:MM
+    const closeTime = workingHours.close_time.slice(0, 5); // HH:MM
+
+    if (requestedTime < openTime || requestedTime >= closeTime) {
+      console.error('❌ Outside working hours:', { requestedTime, openTime, closeTime });
+      return NextResponse.json({
+        results: [{
+          toolCallId: toolCallId,
+          result: JSON.stringify({
+            available: false,
+            reason: 'Outside working hours',
+            actual_date: actualDate,
+            message: `Lo siento, trabajamos de ${openTime} a ${closeTime}`
+          })
+        }]
+      }, { headers: corsHeaders });
+    }
+
+    console.log('✅ Within working hours:', { requestedTime, openTime, closeTime });
 
     // Calculate end time
-    const requestedStart = new Date(`${booking_date}T${booking_time}:00`);
+    const requestedStart = new Date(`${actualDate}T${actualTime}:00`);
     const requestedEnd = new Date(requestedStart.getTime() + service.duration * 60000);
+
+    console.log('🕐 Requested slot:', { 
+      start: actualTime, 
+      end: requestedEnd.toTimeString().slice(0, 5),
+      duration: service.duration 
+    });
 
     // Get all services for this business (to map durations)
     const { data: allServices } = await supabase
@@ -111,7 +282,7 @@ export async function POST(request: NextRequest) {
       .from('bookings')
       .select('booking_time, service_id')
       .eq('business_id', business.id)
-      .eq('booking_date', booking_date)
+      .eq('booking_date', actualDate)
       .eq('status', 'booked');
 
     if (bookingsError) {
@@ -119,6 +290,11 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('📅 Existing bookings:', existingBookings?.length || 0);
+    if (existingBookings && existingBookings.length > 0) {
+      existingBookings.forEach(b => {
+        console.log('   -', b.booking_time);
+      });
+    }
 
     // Check for overlaps
     let hasOverlap = false;
@@ -126,14 +302,16 @@ export async function POST(request: NextRequest) {
     if (existingBookings && existingBookings.length > 0) {
       for (const booking of existingBookings) {
         const bookingDuration = serviceDurationMap.get(booking.service_id) || 30;
-        const bookingStart = new Date(`${booking_date}T${booking.booking_time}`);
+        const bookingStart = new Date(`${actualDate}T${booking.booking_time}`);
         const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
 
         if (requestedStart < bookingEnd && requestedEnd > bookingStart) {
           hasOverlap = true;
           console.log('❌ Overlap detected:', { 
             existing: booking.booking_time, 
-            requested: booking_time 
+            requested: actualTime,
+            existingEnd: bookingEnd.toTimeString().slice(0, 5),
+            requestedEnd: requestedEnd.toTimeString().slice(0, 5)
           });
           break;
         }
@@ -142,13 +320,16 @@ export async function POST(request: NextRequest) {
 
     // If available
     if (!hasOverlap) {
-      console.log('✅ Time slot available');
+      console.log('✅ Time slot available!');
+      console.log('===== checkAvailability END =====\n');
       return NextResponse.json({
         results: [{
           toolCallId: toolCallId,
           result: JSON.stringify({
             available: true,
-            booking_time: booking_time,
+            actual_date: actualDate,
+            booking_time: actualTime,
+            service_name: service.name, // Use DB name
             message: 'Horario disponible'
           })
         }]
@@ -156,53 +337,47 @@ export async function POST(request: NextRequest) {
     }
 
     // If not available, find alternatives
-    const { data: workingHours } = await supabase
-      .from('working_hours')
-      .select('open_time, close_time')
-      .eq('business_id', business.id)
-      .eq('day_of_week', new Date(booking_date).getDay())
-      .single();
-
-    const suggestedTimes: string[] = [];
+    console.log('🔍 Finding alternative times...');
     
-    if (workingHours) {
-      const workStart = new Date(`${booking_date}T${workingHours.open_time}`);
-      const workEnd = new Date(`${booking_date}T${workingHours.close_time}`);
-      let currentSlot = new Date(workStart);
+    const suggestedTimes: string[] = [];
+    const workStart = new Date(`${actualDate}T${openTime}:00`);
+    const workEnd = new Date(`${actualDate}T${closeTime}:00`);
+    let currentSlot = new Date(workStart);
+    
+    while (currentSlot < workEnd && suggestedTimes.length < 3) {
+      const slotEnd = new Date(currentSlot.getTime() + service.duration * 60000);
+      if (slotEnd > workEnd) break;
       
-      while (currentSlot < workEnd && suggestedTimes.length < 3) {
-        const slotEnd = new Date(currentSlot.getTime() + service.duration * 60000);
-        if (slotEnd > workEnd) break;
-        
-        let isFree = true;
-        if (existingBookings) {
-          for (const booking of existingBookings) {
-            const bookingDuration = serviceDurationMap.get(booking.service_id) || 30;
-            const bookingStart = new Date(`${booking_date}T${booking.booking_time}`);
-            const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
+      let isFree = true;
+      if (existingBookings) {
+        for (const booking of existingBookings) {
+          const bookingDuration = serviceDurationMap.get(booking.service_id) || 30;
+          const bookingStart = new Date(`${actualDate}T${booking.booking_time}`);
+          const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
 
-            if (currentSlot < bookingEnd && slotEnd > bookingStart) {
-              isFree = false;
-              break;
-            }
+          if (currentSlot < bookingEnd && slotEnd > bookingStart) {
+            isFree = false;
+            break;
           }
         }
-        
-        if (isFree) {
-          suggestedTimes.push(currentSlot.toTimeString().slice(0, 5));
-        }
-        
-        currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
       }
+      
+      if (isFree) {
+        suggestedTimes.push(currentSlot.toTimeString().slice(0, 5));
+      }
+      
+      currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
     }
 
     console.log('❌ Time slot occupied. Suggestions:', suggestedTimes);
+    console.log('===== checkAvailability END =====\n');
 
     return NextResponse.json({
       results: [{
         toolCallId: toolCallId,
         result: JSON.stringify({
           available: false,
+          actual_date: actualDate,
           reason: 'Horario ocupado',
           suggested_times: suggestedTimes,
           message: suggestedTimes.length > 0 
@@ -214,6 +389,8 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ checkAvailability error:', error);
+    console.log('===== checkAvailability END (ERROR) =====\n');
+    
     const body = await request.json().catch(() => ({}));
     const toolCallId = body.message?.toolCallList?.[0]?.id;
     
