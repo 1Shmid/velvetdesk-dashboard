@@ -344,9 +344,19 @@ export async function POST(request: NextRequest) {
     const workEnd = new Date(`${actualDate}T${closeTime}:00`);
     let currentSlot = new Date(workStart);
     
+    const requestedTimeStr = actualTime; // e.g., "15:00"
+    
     while (currentSlot < workEnd && suggestedTimes.length < 3) {
       const slotEnd = new Date(currentSlot.getTime() + service.duration * 60000);
       if (slotEnd > workEnd) break;
+      
+      const currentTimeStr = currentSlot.toTimeString().slice(0, 5);
+      
+      // Skip if this is the requested time (already occupied)
+      if (currentTimeStr === requestedTimeStr) {
+        currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
+        continue;
+      }
       
       let isFree = true;
       if (existingBookings) {
@@ -363,7 +373,7 @@ export async function POST(request: NextRequest) {
       }
       
       if (isFree) {
-        suggestedTimes.push(currentSlot.toTimeString().slice(0, 5));
+        suggestedTimes.push(currentTimeStr);
       }
       
       currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
