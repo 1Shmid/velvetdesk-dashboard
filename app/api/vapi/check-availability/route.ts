@@ -71,43 +71,34 @@ function calculateDate(weekdayStr: string): string {
  * @returns HH:MM string
  */
 function normalizeTime(timeStr: string): string {
-  console.log('🕐 normalizeTime input:', timeStr);
+  // If already HH:MM
+  if (/^\d{1,2}:\d{2}$/.test(timeStr)) return timeStr;
   
-  // Already in HH:MM format
-  if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
-    console.log('✅ Already formatted time:', timeStr);
-    return timeStr.padStart(5, '0');
-  }
-
   const lowerTime = timeStr.toLowerCase().trim();
-
-  // Handle "3 de la tarde" / "12 de la mañana"
+  
+  // "3 de la tarde" → 15:00
   const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
   if (afternoonMatch) {
     const hour = parseInt(afternoonMatch[1]);
-    const result = `${hour === 12 ? 12 : hour + 12}:00`;
-    console.log(`✅ "${timeStr}" → ${result}`);
-    return result;
+    return `${hour === 12 ? 12 : hour + 12}:00`;
   }
-
+  
+  // "10 de la mañana" → 10:00
   const morningMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*mañana|am)/);
   if (morningMatch) {
     const hour = parseInt(morningMatch[1]);
-    const result = `${hour.toString().padStart(2, '0')}:00`;
-    console.log(`✅ "${timeStr}" → ${result}`);
-    return result;
+    return `${hour.toString().padStart(2, '0')}:00`;
   }
-
-  // Just a number (e.g., "12")
+  
+  // Just number: "5" → assume afternoon if < 12
   const numberMatch = lowerTime.match(/^\d+$/);
   if (numberMatch) {
     const hour = parseInt(lowerTime);
-    const result = `${hour.toString().padStart(2, '0')}:00`;
-    console.log(`✅ "${timeStr}" → ${result}`);
-    return result;
+    // ✅ НОВАЯ ЛОГИКА: если < 12 → предполагаем tarde
+    const adjustedHour = (hour >= 1 && hour < 12) ? hour + 12 : hour;
+    return `${adjustedHour.toString().padStart(2, '0')}:00`;
   }
-
-  console.error('❌ Could not parse time:', timeStr);
+  
   return '12:00'; // fallback
 }
 
@@ -336,12 +327,22 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     }
 
-    // If not available, find alternatives
-    console.log('🔍 Finding alternative times...');
-    
+    // If not available, find alternatives AROUND requested time
+    console.log('🔍 Finding alternative times around requested slot...');
+
     const suggestedTimes: string[] = [];
-    const workStart = new Date(`${actualDate}T${openTime}:00`);
-    const workEnd = new Date(`${actualDate}T${closeTime}:00`);
+    const requestedHour = parseInt(actualTime.split(':')[0]);
+    const openHour = parseInt(openTime.split(':')[0]);
+    const closeHour = parseInt(closeTime.split(':')[0]);
+
+    // Search ±2 hours from requested time
+    const searchStart = Math.max(requestedHour - 2, openHour);
+    const searchEnd = Math.min(requestedHour + 2, closeHour);
+
+    console.log('🔍 Search range:', { searchStart, searchEnd, requested: requestedHour });
+
+    const workStart = new Date(`${actualDate}T${searchStart.toString().padStart(2, '0')}:00:00`);
+    const workEnd = new Date(`${actualDate}T${searchEnd.toString().padStart(2, '0')}:00:00`);
     let currentSlot = new Date(workStart);
     
     const requestedTimeStr = actualTime; // e.g., "15:00"
