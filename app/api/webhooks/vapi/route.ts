@@ -152,43 +152,60 @@ export async function POST(request: Request) {
 
     // Парсинг времени
     const parseBookingTime = (timeStr: string): string => {
-      const lowerTime = timeStr.toLowerCase().trim();
-      
-      // Уже в формате HH:MM (проверяем ПЕРВЫМ!)
-      const exactMatch = lowerTime.match(/(\d{1,2}):(\d{2})/);
-      if (exactMatch) {
-        const h = exactMatch[1].padStart(2, '0');
-        const m = exactMatch[2];
-        return `${h}:${m}`;
-      }
-      
-      // "3 de la tarde" → 15:00
-      const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
-      if (afternoonMatch) {
-        const hour = parseInt(afternoonMatch[1]);
-        return `${hour === 12 ? 12 : hour + 12}:00`;
-      }
-      
-      // "10 de la mañana" → 10:00
-      const morningMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*mañana|am)/);
-      if (morningMatch) {
-        const hour = parseInt(morningMatch[1]);
+    const lowerTime = timeStr.toLowerCase().trim();
+    
+    // Уже в формате HH:MM или H:MM
+    const exactMatch = lowerTime.match(/(\d{1,2}):(\d{2})/);
+    if (exactMatch) {
+      const h = exactMatch[1].padStart(2, '0');
+      const m = exactMatch[2];
+      return `${h}:${m}`;
+    }
+    
+    // "12 30" (БЕЗ двоеточия) → "12:30"
+    const spaceMatch = lowerTime.match(/(?:las\s+|a\s+las\s+)?(\d{1,2})\s+(\d{2})(?:\s|$)/);
+    if (spaceMatch) {
+      const h = spaceMatch[1].padStart(2, '0');
+      const m = spaceMatch[2];
+      return `${h}:${m}`;
+    }
+    
+    // "12 y media" → "12:30"
+    const mediaMatch = lowerTime.match(/(?:las\s+|a\s+las\s+)?(\d{1,2})\s+y\s+media/);
+    if (mediaMatch) {
+      const h = mediaMatch[1].padStart(2, '0');
+      return `${h}:30`;
+    }
+    
+    // "3 de la tarde" → 15:00
+    const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
+    if (afternoonMatch) {
+      const hour = parseInt(afternoonMatch[1]);
+      return `${hour === 12 ? 12 : hour + 12}:00`;
+    }
+    
+    // "10 de la mañana" → 10:00
+    const morningMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*mañana|am)/);
+    if (morningMatch) {
+      const hour = parseInt(morningMatch[1]);
+      return `${hour.toString().padStart(2, '0')}:00`;
+    }
+    
+    // "las 3", "a las 3", "3" → assume afternoon if < 12
+    const hourOnlyMatch = lowerTime.match(/(?:las\s+|a\s+las\s+)?(\d{1,2})(?:\s|$)/);
+    if (hourOnlyMatch) {
+      const hour = parseInt(hourOnlyMatch[1]);
+      if (hour >= 1 && hour < 12) {
+        // Assume afternoon (add 12)
+        return `${(hour + 12).toString().padStart(2, '0')}:00`;
+      } else if (hour >= 12 && hour <= 23) {
         return `${hour.toString().padStart(2, '0')}:00`;
       }
-      
-      // "las 12", "a las 12", "12" → 12:00 (только если НЕТ двоеточия)
-      const hourOnlyMatch = lowerTime.match(/(?:las\s+|a\s+las\s+)?(\d{1,2})(?:\s|$)/);
-      if (hourOnlyMatch) {
-        const hour = parseInt(hourOnlyMatch[1]);
-        if (hour >= 0 && hour <= 23) {
-          return `${hour.toString().padStart(2, '0')}:00`;
-        }
-      }
-      
-      // Если ничего не распарсилось - логируем и возвращаем пустую строку
-      console.error('⚠️ Failed to parse time:', timeStr);
-      return '';
-    };
+    }
+    
+    console.error('⚠️ Failed to parse time:', timeStr);
+    return '';
+  };
 
     const parsedDate = parseBookingDate(bookingDate);
     const parsedTime = parseBookingTime(bookingTime);
