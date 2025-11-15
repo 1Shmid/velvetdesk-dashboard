@@ -154,6 +154,14 @@ export async function POST(request: Request) {
     const parseBookingTime = (timeStr: string): string => {
       const lowerTime = timeStr.toLowerCase().trim();
       
+      // Уже в формате HH:MM (проверяем ПЕРВЫМ!)
+      const exactMatch = lowerTime.match(/(\d{1,2}):(\d{2})/);
+      if (exactMatch) {
+        const h = exactMatch[1].padStart(2, '0');
+        const m = exactMatch[2];
+        return `${h}:${m}`;
+      }
+      
       // "3 de la tarde" → 15:00
       const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
       if (afternoonMatch) {
@@ -168,14 +176,8 @@ export async function POST(request: Request) {
         return `${hour.toString().padStart(2, '0')}:00`;
       }
       
-      // Уже HH:MM
-      if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
-        const [h, m] = timeStr.split(':');
-        return `${h.padStart(2, '0')}:${m}`;
-      }
-      
-      // "las 12", "a las 12", "12" → 12:00
-      const hourOnlyMatch = lowerTime.match(/(?:las\s+)?(\d{1,2})(?!\s*:)/);
+      // "las 12", "a las 12", "12" → 12:00 (только если НЕТ двоеточия)
+      const hourOnlyMatch = lowerTime.match(/(?:las\s+|a\s+las\s+)?(\d{1,2})(?:\s|$)/);
       if (hourOnlyMatch) {
         const hour = parseInt(hourOnlyMatch[1]);
         if (hour >= 0 && hour <= 23) {
@@ -183,7 +185,7 @@ export async function POST(request: Request) {
         }
       }
       
-      // Если ничего не распарсилось - логируем и возвращаем null
+      // Если ничего не распарсилось - логируем и возвращаем пустую строку
       console.error('⚠️ Failed to parse time:', timeStr);
       return '';
     };
