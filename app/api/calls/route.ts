@@ -30,6 +30,7 @@ export async function GET(request: Request) {
           service_id
         )
       `)
+      .eq('id', callId)
       .eq('business_id', session.user.businessId)
       .single(); // ← это должно вернуть один объект
 
