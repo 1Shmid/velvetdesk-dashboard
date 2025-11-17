@@ -474,8 +474,8 @@ export default function CallDetailPage({ params }: { params: Promise<{ id: strin
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <p className="text-sm">
               <strong>Outcome:</strong>{' '}
-              {call.booking 
-                ? `Booking confirmed for ${call.customer_name}, ${call.booking.booking_date}, ${call.booking.booking_time.slice(0, 5)}`
+              {call.bookings && call.bookings.length > 0
+                ? `Booking confirmed for ${call.customer_name}, ${call.bookings[0].booking_date}, ${call.bookings[0].booking_time.slice(0, 5)}`
                 : call.summary || 'No summary available'
               }
             </p>
