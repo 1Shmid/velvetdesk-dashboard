@@ -21,9 +21,16 @@ export async function GET(request: Request) {
   if (callId) {
     const { data: call, error } = await supabase
       .from('calls')
-      .select('*')
+      .select(`
+        *,
+        booking:bookings(
+          id,
+          booking_date,
+          booking_time,
+          service_id
+        )
+      `)
       .eq('id', callId)
-      .eq('business_id', session.user.businessId)
       .single(); // ← это должно вернуть один объект
 
     if (error) {
@@ -37,7 +44,10 @@ export async function GET(request: Request) {
   // All calls (массив)
   const { data: calls, error } = await supabase
     .from('calls')
-    .select('*')
+    .select(`
+      *,
+      booking:bookings(id, booking_date, booking_time, service_id)
+    `)
     .eq('business_id', session.user.businessId)
     .order('created_at', { ascending: false });
 
