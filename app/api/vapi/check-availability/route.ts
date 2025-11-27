@@ -47,10 +47,14 @@ function calculateDate(weekdayStr: string): string {
 
   if (targetDay === undefined) {
     console.error('❌ Unknown weekday:', weekdayStr);
-    return new Date().toISOString().split('T')[0]; // fallback to today
+    // ✅ НОВОЕ: Используем Madrid timezone
+    const now = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' });
+    return new Date(now).toISOString().split('T')[0];
   }
 
-  const today = new Date();
+  // ✅ НОВОЕ: Получаем текущую дату в Madrid timezone
+  const madridNow = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' });
+  const today = new Date(madridNow);
   const currentDay = today.getDay();
   
   let daysUntil = targetDay - currentDay;
@@ -60,7 +64,7 @@ function calculateDate(weekdayStr: string): string {
   targetDate.setDate(today.getDate() + daysUntil);
   
   const result = targetDate.toISOString().split('T')[0];
-  console.log(`✅ "${weekdayStr}" → ${result} (in ${daysUntil} days)`);
+  console.log(`✅ "${weekdayStr}" → ${result} (in ${daysUntil} days, Madrid time)`);
   
   return result;
 }
