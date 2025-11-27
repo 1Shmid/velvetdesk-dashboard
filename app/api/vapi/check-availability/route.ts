@@ -42,7 +42,18 @@ function calculateDate(weekdayStr: string): string {
     return weekdayStr;
   }
 
+  // ✅ НОВОЕ: Handle "mañana" (tomorrow)
   const normalized = weekdayStr.toLowerCase().trim();
+  if (normalized === 'mañana' || normalized === 'manana') {
+    const madridNow = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' });
+    const today = new Date(madridNow);
+    today.setDate(today.getDate() + 1); // Tomorrow
+    const result = today.toISOString().split('T')[0];
+    console.log(`✅ "mañana" → ${result} (tomorrow)`);
+    return result;
+  }
+  
+  // Handle weekdays (lunes, martes, etc)
   const targetDay = SPANISH_WEEKDAYS[normalized];
 
   if (targetDay === undefined) {
