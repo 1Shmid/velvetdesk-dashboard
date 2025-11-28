@@ -88,12 +88,12 @@ export async function POST(request: NextRequest) {
 
     // Update booking status to cancelled
     const { error: updateError } = await supabase
-      .from('bookings')
-      .update({ 
-        status: 'cancelled',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', booking_id);
+    .from('bookings')
+    .update({ 
+        status: 'cancelled'
+        // Убрали updated_at
+    })
+    .eq('id', booking_id);
 
     if (updateError) {
       console.error('❌ Error updating booking:', updateError);
