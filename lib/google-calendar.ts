@@ -31,18 +31,16 @@ export async function createCalendarEvent(
   eventData: CalendarEvent
 ): Promise<string | null> {
   try {
-
     // Debug logging
     console.log('🔍 Calendar API Debug:', {
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    calendarId: process.env.GOOGLE_CALENDAR_ID,
-    privateKeyExists: !!process.env.GOOGLE_PRIVATE_KEY,
-    privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length,
-    privateKeyStart: process.env.GOOGLE_PRIVATE_KEY?.substring(0, 50),
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      calendarId: process.env.GOOGLE_CALENDAR_ID,
+      privateKeyExists: !!process.env.GOOGLE_PRIVATE_KEY,
+      privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length,
+      privateKeyStart: process.env.GOOGLE_PRIVATE_KEY?.substring(0, 50),
     });
 
     const calendar = getCalendarClient();
-
 
     // Combine date and time into ISO format 
     const startDateTime = `${eventData.booking_date}T${eventData.booking_time}:00`;
@@ -82,14 +80,14 @@ export async function createCalendarEvent(
   } catch (error: any) {
     console.error('❌ Calendar sync failed:', error);
     console.error('📋 Error details:', {
-        message: error.message,
-        code: error.code,
-        status: error.status,
-        errors: error.errors,
-        response: error.response?.data,
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      errors: error.errors,
+      response: error.response?.data,
     });
     return null;
-    }
+  }
 }
 
 // Update calendar event (for future use)
@@ -140,7 +138,7 @@ export async function updateCalendarEvent(
   }
 }
 
-// Delete calendar event (for future use)
+// Delete calendar event
 export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
   try {
     const calendar = getCalendarClient();
