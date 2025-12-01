@@ -104,36 +104,62 @@ export async function POST(request: NextRequest) {
 
     // Strategy 2: Fallback to name + phone (if phone search failed)
     if (bookings.length === 0 && customer_name && fallback_phone) {
-      console.log('📞 Fallback: searching by name + phone:', { customer_name, fallback_phone });
-      
-      const { data } = await supabase
+    console.log('📞 Fallback: searching by name + phone:', { customer_name, fallback_phone });
+    
+    // Normalize function: lowercase + remove accents
+    const normalizeName = (name: string) => {
+        return name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove accents: García → garcia
+        .trim();
+    };
+
+    const normalizedSearchName = normalizeName(customer_name);
+    console.log('🔤 Normalized search name:', normalizedSearchName);
+
+    // First, get all bookings with this phone number
+    const { data } = await supabase
         .from('bookings')
         .select(`
-          id,
-          booking_date,
-          booking_time,
-          customer_name,
-          customer_phone,
-          booking_phone,
-          status,
-          services (
+        id,
+        booking_date,
+        booking_time,
+        customer_name,
+        customer_phone,
+        booking_phone,
+        status,
+        services (
             name,
             duration
-          )
+        )
         `)
         .eq('business_id', business.id)
         .in('status', ['booked', 'confirmed'])
         .gte('booking_date', new Date().toISOString().split('T')[0])
-        .ilike('customer_name', `%${customer_name}%`)
         .or(`customer_phone.eq.${fallback_phone},booking_phone.eq.${fallback_phone}`)
         .order('booking_date', { ascending: true })
         .order('booking_time', { ascending: true });
 
-      if (data && data.length > 0) {
-        bookings = data;
-        customerNameFromBooking = data[0].customer_name;
-        console.log('✅ Found by name+phone:', bookings.length, 'bookings');
-      }
+    console.log('📋 Found bookings by phone:', data?.length || 0);
+
+    // Then filter by normalized name in JavaScript
+    if (data && data.length > 0) {
+        const filteredBookings = data.filter(booking => {
+        const normalizedDbName = normalizeName(booking.customer_name);
+        console.log(`🔤 Comparing: "${normalizedSearchName}" vs "${normalizedDbName}"`);
+        return normalizedDbName.includes(normalizedSearchName) || 
+                normalizedSearchName.includes(normalizedDbName);
+        });
+
+        if (filteredBookings.length > 0) {
+        bookings = filteredBookings;
+        customerNameFromBooking = filteredBookings[0].customer_name;
+        console.log('✅ Found by name+phone after normalization:', bookings.length, 'bookings');
+        } else {
+        console.log('⚠️ Phone match found but name mismatch after normalization');
+        }
+    }
     }
 
     // No bookings found
