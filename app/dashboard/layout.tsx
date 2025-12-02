@@ -13,8 +13,10 @@ import {
   Calendar,
   LogOut,
   Menu,
-  X
+  X,
+  Users 
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -25,6 +27,7 @@ const navigation = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Bookings", href: "/dashboard/bookings", icon: Calendar },
+  { name: "Staff", href: "/dashboard/staff", icon: Users },
 ];
 
 export default function DashboardLayout({
