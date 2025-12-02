@@ -7,6 +7,28 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const businessId = (session.user as any).businessId;
+
+    const { data: services } = await supabase
+      .from("services")
+      .select("id, name, price, duration")
+      .eq("business_id", businessId)
+      .eq("is_active", true)
+      .order("name");
+
+    return NextResponse.json(services || []);
+  } catch (error) {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await auth();
