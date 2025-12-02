@@ -234,7 +234,22 @@ export async function POST(request: Request) {
     const finalBookingDate = fixPastDate(parsedDate);
     const finalBookingTime = parsedTime;
 
-    // Создаём booking
+    // ✅ FIX: Don't create booking if this was a modification/cancellation
+    const isModification = transcript.toLowerCase().includes('cambiar') || 
+                          transcript.toLowerCase().includes('modificar') ||
+                          transcript.toLowerCase().includes('mover');
+    const isCancellation = transcript.toLowerCase().includes('cancelar');
+
+    if (isModification || isCancellation) {
+      console.log('⚠️ Skipping booking creation - this was a modification/cancellation');
+      return NextResponse.json({ 
+        success: true, 
+        call_id: savedCall.id,
+        message: 'Call saved, booking not created (modification/cancellation)' 
+      });
+    }
+
+    // Создаём booking (только если это НЕ модификация/отмена)
     if (outcome === 'booked' && serviceRequested !== 'Unknown') {
       console.log('🔍 Service search:', {
         searchTerm: serviceRequested,
