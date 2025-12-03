@@ -16,6 +16,8 @@ interface CalendarEvent {
 interface AvailabilityResult {
   available: boolean;
   suggestedTimes: string[];
+  availableStaff?: Array<{ id: string; name: string }>;
+  assignedStaff?: { id: string; name: string };
 }
 
 // Authenticate with Google Calendar API
@@ -180,67 +182,180 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
   }
 }
 
-// Check time slot availability
-export async function checkAvailability(
-  businessId: string,
-  bookingDate: string,
-  bookingTime: string,
-  duration: number,
-  staffId?: string
-): Promise<AvailabilityResult> {
-  try {
-    const calendar = getCalendarClient();
-    
-    let calendarId = process.env.GOOGLE_CALENDAR_ID!;
-    
-    if (staffId) {
+// Check time slot availability (universal: single staff or all staff)
+  export async function checkAvailability(
+    businessId: string,
+    bookingDate: string,
+    bookingTime: string,
+    duration: number,
+    staffId?: string
+  ): Promise<AvailabilityResult> {
+    try {
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
-      const { data: staff } = await supabase
+
+      const requestedStart = new Date(`${bookingDate}T${bookingTime}:00`);
+      const requestedEnd = new Date(requestedStart.getTime() + duration * 60000);
+
+      const dayStart = new Date(bookingDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(bookingDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      // If staff_id specified → check only that staff
+      if (staffId) {
+        const { data: staff } = await supabase
+          .from('staff')
+          .select('id, name, calendar_id')
+          .eq('id', staffId)
+          .eq('is_active', true)
+          .single();
+
+        if (!staff) {
+          return { available: false, suggestedTimes: [] };
+        }
+
+        const calendar = getCalendarClient();
+        const { data: events } = await calendar.events.list({
+          calendarId: staff.calendar_id,
+          timeMin: dayStart.toISOString(),
+          timeMax: dayEnd.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
+
+        const bookedSlots = (events.items || []).map((event: any) => ({
+          start: new Date(event.start.dateTime || event.start.date),
+          end: new Date(event.end.dateTime || event.end.date),
+        }));
+
+        const hasConflict = bookedSlots.some(slot => {
+          return (
+            (requestedStart >= slot.start && requestedStart < slot.end) ||
+            (requestedEnd > slot.start && requestedEnd <= slot.end) ||
+            (requestedStart <= slot.start && requestedEnd >= slot.end)
+          );
+        });
+
+        if (!hasConflict) {
+          return {
+            available: true,
+            suggestedTimes: [],
+            assignedStaff: { id: staff.id, name: staff.name }
+          };
+        }
+
+        // Find alternative times for this staff
+        const suggestedTimes = await findAlternativeTimes(
+          staff.calendar_id,
+          bookingDate,
+          duration,
+          bookedSlots
+        );
+
+        return { available: false, suggestedTimes };
+      }
+
+      // If NO staff_id → check ALL staff calendars
+      const { data: allStaff } = await supabase
         .from('staff')
-        .select('calendar_id')
-        .eq('id', staffId)
+        .select('id, name, calendar_id')
+        .eq('business_id', businessId)
         .eq('is_active', true)
-        .single();
-      if (staff?.calendar_id) calendarId = staff.calendar_id;
-    }
+        .order('name');
 
-    const requestedStart = new Date(`${bookingDate}T${bookingTime}:00`);
-    const requestedEnd = new Date(requestedStart.getTime() + duration * 60000);
+      if (!allStaff || allStaff.length === 0) {
+        return { available: false, suggestedTimes: [] };
+      }
 
-    const dayStart = new Date(bookingDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(bookingDate);
-    dayEnd.setHours(23, 59, 59, 999);
+      const calendar = getCalendarClient();
+      const availableStaff: Array<{ id: string; name: string }> = [];
 
-    const { data: events } = await calendar.events.list({
-      calendarId: calendarId,
-      timeMin: dayStart.toISOString(),
-      timeMax: dayEnd.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+      for (const staff of allStaff) {
+        const { data: events } = await calendar.events.list({
+          calendarId: staff.calendar_id,
+          timeMin: dayStart.toISOString(),
+          timeMax: dayEnd.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
 
-    const bookedSlots = (events.items || []).map((event: any) => ({
-      start: new Date(event.start.dateTime || event.start.date),
-      end: new Date(event.end.dateTime || event.end.date),
-    }));
+        const bookedSlots = (events.items || []).map((event: any) => ({
+          start: new Date(event.start.dateTime || event.start.date),
+          end: new Date(event.end.dateTime || event.end.date),
+        }));
 
-    const hasConflict = bookedSlots.some(slot => {
-      return (
-        (requestedStart >= slot.start && requestedStart < slot.end) ||
-        (requestedEnd > slot.start && requestedEnd <= slot.end) ||
-        (requestedStart <= slot.start && requestedEnd >= slot.end)
-      );
-    });
+        const hasConflict = bookedSlots.some(slot => {
+          return (
+            (requestedStart >= slot.start && requestedStart < slot.end) ||
+            (requestedEnd > slot.start && requestedEnd <= slot.end) ||
+            (requestedStart <= slot.start && requestedEnd >= slot.end)
+          );
+        });
 
-    if (!hasConflict) {
+        if (!hasConflict) {
+          availableStaff.push({ id: staff.id, name: staff.name });
+        }
+      }
+
+      if (availableStaff.length > 0) {
+        return {
+          available: true,
+          suggestedTimes: [],
+          availableStaff,
+          assignedStaff: availableStaff[0] // First available as default
+        };
+      }
+
+      // No staff available - find alternative times across all calendars
+      const suggestedTimes: string[] = [];
+      const workStart = 9;
+      const workEnd = 20;
+
+      for (let hour = workStart; hour < workEnd && suggestedTimes.length < 3; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          if (suggestedTimes.length >= 3) break;
+          
+          const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          const slotStart = new Date(`${bookingDate}T${slotTime}:00`);
+          const slotEnd = new Date(slotStart.getTime() + duration * 60000);
+
+          // Check if ANY staff is available at this time
+          for (const staff of allStaff) {
+            const { data: events } = await calendar.events.list({
+              calendarId: staff.calendar_id,
+              timeMin: slotStart.toISOString(),
+              timeMax: slotEnd.toISOString(),
+              singleEvents: true,
+            });
+
+            const hasConflict = events.items && events.items.length > 0;
+
+            if (!hasConflict) {
+              suggestedTimes.push(slotTime);
+              break;
+            }
+          }
+        }
+      }
+
+      return { available: false, suggestedTimes };
+    } catch (error) {
+      console.error('❌ Availability check failed:', error);
       return { available: true, suggestedTimes: [] };
     }
+  }
 
+  // Helper function to find alternative times
+  async function findAlternativeTimes(
+    calendarId: string,
+    bookingDate: string,
+    duration: number,
+    existingSlots: Array<{ start: Date; end: Date }>
+  ): Promise<string[]> {
     const suggestedTimes: string[] = [];
     const workStart = 9;
     const workEnd = 20;
@@ -251,7 +366,7 @@ export async function checkAvailability(
         const slotStart = new Date(`${bookingDate}T${slotTime}:00`);
         const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
-        const slotConflict = bookedSlots.some(slot => {
+        const slotConflict = existingSlots.some(slot => {
           return (
             (slotStart >= slot.start && slotStart < slot.end) ||
             (slotEnd > slot.start && slotEnd <= slot.end) ||
@@ -265,9 +380,5 @@ export async function checkAvailability(
       }
     }
 
-    return { available: false, suggestedTimes };
-  } catch (error) {
-    console.error('❌ Availability check failed:', error);
-    return { available: true, suggestedTimes: [] };
+    return suggestedTimes;
   }
-}
