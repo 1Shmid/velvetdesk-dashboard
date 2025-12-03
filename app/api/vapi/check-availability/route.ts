@@ -52,7 +52,7 @@ function calculateDate(weekdayStr: string): string {
     console.log(`✅ "mañana" → ${result} (tomorrow)`);
     return result;
   }
-  
+
   // Handle weekdays (lunes, martes, etc)
   const targetDay = SPANISH_WEEKDAYS[normalized];
 
@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
     console.log('📋 Raw parameters:', rawParams);
 
     const { service_name, booking_date, booking_time } = rawParams;
+    const staff_id = rawParams.staff_id || null;
 
     // Calculate actual date and normalize time
     const actualDate = calculateDate(booking_date);
@@ -284,12 +285,18 @@ export async function POST(request: NextRequest) {
     );
 
     // Get all bookings for this date
-    const { data: existingBookings, error: bookingsError } = await supabase
+    let bookingsQuery = supabase
       .from('bookings')
       .select('booking_time, service_id')
       .eq('business_id', business.id)
       .eq('booking_date', actualDate)
       .eq('status', 'booked');
+    
+    if (staff_id) {
+      bookingsQuery = bookingsQuery.eq('staff_id', staff_id);
+    }
+    
+    const { data: existingBookings, error: bookingsError } = await bookingsQuery;
 
     if (bookingsError) {
       console.error('❌ Error fetching bookings:', bookingsError);
@@ -336,6 +343,7 @@ export async function POST(request: NextRequest) {
             actual_date: actualDate,
             booking_time: actualTime,
             service_name: service.name, // Use DB name
+            staff_id: staff_id,
             message: 'Horario disponible'
           })
         }]
