@@ -317,7 +317,8 @@ export async function POST(request: Request) {
             service_id: services[0].id,
             booking_date: finalBookingDate,
             booking_time: finalBookingTime,
-            status: 'booked'
+            status: 'booked',
+            staff_id: bookingOutput.assigned_staff?.id || bookingOutput.staff_id || null
           })
           .select()
           .single();
@@ -346,7 +347,7 @@ export async function POST(request: Request) {
               booking_date: finalBookingDate,
               booking_time: finalBookingTime,
               duration: services[0].duration,
-            });
+            }, bookingOutput.assigned_staff?.id || bookingOutput.staff_id || null);
 
             // Update booking with calendar_event_id
             if (calendarEventId) {
