@@ -13,6 +13,11 @@ interface CalendarEvent {
   duration: number; // minutes
 }
 
+interface AvailabilityResult {
+  available: boolean;
+  suggestedTimes: string[];
+}
+
 // Authenticate with Google Calendar API
 function getCalendarClient() {
   const auth = new google.auth.GoogleAuth({
@@ -28,7 +33,8 @@ function getCalendarClient() {
 
 // Create calendar event
 export async function createCalendarEvent(
-  eventData: CalendarEvent
+  eventData: CalendarEvent,
+  staffId?: string
 ): Promise<string | null> {
   try {
     // Debug logging
@@ -41,6 +47,24 @@ export async function createCalendarEvent(
     });
 
     const calendar = getCalendarClient();
+
+    // Determine which calendar to use
+    let calendarId = process.env.GOOGLE_CALENDAR_ID!;
+    
+    if (staffId) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: staff } = await supabase
+        .from('staff')
+        .select('calendar_id')
+        .eq('id', staffId)
+        .eq('is_active', true)
+        .single();
+      if (staff?.calendar_id) calendarId = staff.calendar_id;
+    }
 
     // Combine date and time into ISO format 
     const startDateTime = `${eventData.booking_date}T${eventData.booking_time}:00`;
@@ -71,7 +95,7 @@ export async function createCalendarEvent(
     };
 
     const response = await calendar.events.insert({
-      calendarId: process.env.GOOGLE_CALENDAR_ID!,
+      calendarId: calendarId,
       requestBody: event,
     });
 
@@ -153,5 +177,97 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
   } catch (error) {
     console.error('❌ Calendar delete failed:', error);
     return false;
+  }
+}
+
+// Check time slot availability
+export async function checkAvailability(
+  businessId: string,
+  bookingDate: string,
+  bookingTime: string,
+  duration: number,
+  staffId?: string
+): Promise<AvailabilityResult> {
+  try {
+    const calendar = getCalendarClient();
+    
+    let calendarId = process.env.GOOGLE_CALENDAR_ID!;
+    
+    if (staffId) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: staff } = await supabase
+        .from('staff')
+        .select('calendar_id')
+        .eq('id', staffId)
+        .eq('is_active', true)
+        .single();
+      if (staff?.calendar_id) calendarId = staff.calendar_id;
+    }
+
+    const requestedStart = new Date(`${bookingDate}T${bookingTime}:00`);
+    const requestedEnd = new Date(requestedStart.getTime() + duration * 60000);
+
+    const dayStart = new Date(bookingDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(bookingDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const { data: events } = await calendar.events.list({
+      calendarId: calendarId,
+      timeMin: dayStart.toISOString(),
+      timeMax: dayEnd.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    const bookedSlots = (events.items || []).map((event: any) => ({
+      start: new Date(event.start.dateTime || event.start.date),
+      end: new Date(event.end.dateTime || event.end.date),
+    }));
+
+    const hasConflict = bookedSlots.some(slot => {
+      return (
+        (requestedStart >= slot.start && requestedStart < slot.end) ||
+        (requestedEnd > slot.start && requestedEnd <= slot.end) ||
+        (requestedStart <= slot.start && requestedEnd >= slot.end)
+      );
+    });
+
+    if (!hasConflict) {
+      return { available: true, suggestedTimes: [] };
+    }
+
+    const suggestedTimes: string[] = [];
+    const workStart = 9;
+    const workEnd = 20;
+
+    for (let hour = workStart; hour < workEnd; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const slotStart = new Date(`${bookingDate}T${slotTime}:00`);
+        const slotEnd = new Date(slotStart.getTime() + duration * 60000);
+
+        const slotConflict = bookedSlots.some(slot => {
+          return (
+            (slotStart >= slot.start && slotStart < slot.end) ||
+            (slotEnd > slot.start && slotEnd <= slot.end) ||
+            (slotStart <= slot.start && slotEnd >= slot.end)
+          );
+        });
+
+        if (!slotConflict && suggestedTimes.length < 3) {
+          suggestedTimes.push(slotTime);
+        }
+      }
+    }
+
+    return { available: false, suggestedTimes };
+  } catch (error) {
+    console.error('❌ Availability check failed:', error);
+    return { available: true, suggestedTimes: [] };
   }
 }
