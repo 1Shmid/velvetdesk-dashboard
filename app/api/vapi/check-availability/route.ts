@@ -264,77 +264,25 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Within working hours:', { requestedTime, openTime, closeTime });
 
-    // Calculate end time
-    const requestedStart = new Date(`${actualDate}T${actualTime}:00`);
-    const requestedEnd = new Date(requestedStart.getTime() + service.duration * 60000);
-
-    console.log('🕐 Requested slot:', { 
-      start: actualTime, 
-      end: requestedEnd.toTimeString().slice(0, 5),
-      duration: service.duration 
-    });
-
-    // Get all services for this business (to map durations)
-    const { data: allServices } = await supabase
-      .from('services')
-      .select('id, duration')
-      .eq('business_id', business.id);
-
-    const serviceDurationMap = new Map(
-      allServices?.map(s => [s.id, s.duration]) || []
+    
+    // Use Google Calendar checkAvailability
+    const { checkAvailability: checkGoogleAvailability } = await import('@/lib/google-calendar');
+    
+    const availability = await checkGoogleAvailability(
+      business.id,
+      actualDate,
+      actualTime,
+      service.duration,
+      staff_id || undefined
     );
 
-    // Get all bookings for this date
-    let bookingsQuery = supabase
-      .from('bookings')
-      .select('booking_time, service_id')
-      .eq('business_id', business.id)
-      .eq('booking_date', actualDate)
-      .eq('status', 'booked');
-    
-    if (staff_id) {
-      bookingsQuery = bookingsQuery.eq('staff_id', staff_id);
-    }
-    
-    const { data: existingBookings, error: bookingsError } = await bookingsQuery;
+    console.log('✅ Availability result:', availability);
+    console.log('===== checkAvailability END =====\n');
 
-    if (bookingsError) {
-      console.error('❌ Error fetching bookings:', bookingsError);
-    }
+    if (availability.available) {
+      const assignedStaff = availability.assignedStaff;
+      const availableStaff = availability.availableStaff || [];
 
-    console.log('📅 Existing bookings:', existingBookings?.length || 0);
-    if (existingBookings && existingBookings.length > 0) {
-      existingBookings.forEach(b => {
-        console.log('   -', b.booking_time);
-      });
-    }
-
-    // Check for overlaps
-    let hasOverlap = false;
-    
-    if (existingBookings && existingBookings.length > 0) {
-      for (const booking of existingBookings) {
-        const bookingDuration = serviceDurationMap.get(booking.service_id) || 30;
-        const bookingStart = new Date(`${actualDate}T${booking.booking_time}`);
-        const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
-
-        if (requestedStart < bookingEnd && requestedEnd > bookingStart) {
-          hasOverlap = true;
-          console.log('❌ Overlap detected:', { 
-            existing: booking.booking_time, 
-            requested: actualTime,
-            existingEnd: bookingEnd.toTimeString().slice(0, 5),
-            requestedEnd: requestedEnd.toTimeString().slice(0, 5)
-          });
-          break;
-        }
-      }
-    }
-
-    // If available
-    if (!hasOverlap) {
-      console.log('✅ Time slot available!');
-      console.log('===== checkAvailability END =====\n');
       return NextResponse.json({
         results: [{
           toolCallId: toolCallId,
@@ -342,70 +290,18 @@ export async function POST(request: NextRequest) {
             available: true,
             actual_date: actualDate,
             booking_time: actualTime,
-            service_name: service.name, // Use DB name
-            staff_id: staff_id,
-            message: 'Horario disponible'
+            service_name: service.name,
+            assigned_staff: assignedStaff,
+            available_staff: availableStaff,
+            message: availableStaff.length > 1 
+              ? `Horario disponible con ${availableStaff.map(s => s.name).join(' y ')}`
+              : `Horario disponible${assignedStaff ? ' con ' + assignedStaff.name : ''}`
           })
         }]
       }, { headers: corsHeaders });
     }
 
-    // If not available, find alternatives AROUND requested time
-    console.log('🔍 Finding alternative times around requested slot...');
-
-    const suggestedTimes: string[] = [];
-    const requestedHour = parseInt(actualTime.split(':')[0]);
-    const openHour = parseInt(openTime.split(':')[0]);
-    const closeHour = parseInt(closeTime.split(':')[0]);
-
-    // Search ±2 hours from requested time
-    const searchStart = Math.max(requestedHour - 2, openHour);
-    const searchEnd = Math.min(requestedHour + 2, closeHour);
-
-    console.log('🔍 Search range:', { searchStart, searchEnd, requested: requestedHour });
-
-    const workStart = new Date(`${actualDate}T${searchStart.toString().padStart(2, '0')}:00:00`);
-    const workEnd = new Date(`${actualDate}T${searchEnd.toString().padStart(2, '0')}:00:00`);
-    let currentSlot = new Date(workStart);
-    
-    const requestedTimeStr = actualTime; // e.g., "15:00"
-    
-    while (currentSlot < workEnd && suggestedTimes.length < 3) {
-      const slotEnd = new Date(currentSlot.getTime() + service.duration * 60000);
-      if (slotEnd > workEnd) break;
-      
-      const currentTimeStr = currentSlot.toTimeString().slice(0, 5);
-      
-      // Skip if this is the requested time (already occupied)
-      if (currentTimeStr === requestedTimeStr) {
-        currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
-        continue;
-      }
-      
-      let isFree = true;
-      if (existingBookings) {
-        for (const booking of existingBookings) {
-          const bookingDuration = serviceDurationMap.get(booking.service_id) || 30;
-          const bookingStart = new Date(`${actualDate}T${booking.booking_time}`);
-          const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60000);
-
-          if (currentSlot < bookingEnd && slotEnd > bookingStart) {
-            isFree = false;
-            break;
-          }
-        }
-      }
-      
-      if (isFree) {
-        suggestedTimes.push(currentTimeStr);
-      }
-      
-      currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
-    }
-
-    console.log('❌ Time slot occupied. Suggestions:', suggestedTimes);
-    console.log('===== checkAvailability END =====\n');
-
+    // Not available - return suggestions
     return NextResponse.json({
       results: [{
         toolCallId: toolCallId,
@@ -413,9 +309,9 @@ export async function POST(request: NextRequest) {
           available: false,
           actual_date: actualDate,
           reason: 'Horario ocupado',
-          suggested_times: suggestedTimes,
-          message: suggestedTimes.length > 0 
-            ? `Lo siento, esa hora está ocupada. Tengo disponible a las ${suggestedTimes.join(', ')}`
+          suggested_times: availability.suggestedTimes,
+          message: availability.suggestedTimes.length > 0 
+            ? `Lo siento, esa hora está ocupada. Tengo disponible a las ${availability.suggestedTimes.join(', ')}`
             : 'No hay horarios disponibles para ese día'
         })
       }]
