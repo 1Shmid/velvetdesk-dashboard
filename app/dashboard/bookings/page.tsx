@@ -9,8 +9,8 @@ import { ChevronDown, ChevronUp, Phone, FileText } from 'lucide-react';
 interface Booking {
   id: string;
   customer_name: string;
-  customer_phone: string;   // С какого звонил
-  booking_phone: string;    // Для связи
+  customer_phone: string;
+  booking_phone: string;
   booking_date: string;
   booking_time: string;
   status: string;
@@ -20,6 +20,9 @@ interface Booking {
     price: number;
     duration: number;
   };
+  staff: {
+    name: string;
+  } | null;
 }
 
 interface CallData {
@@ -123,7 +126,10 @@ export default function BookingsPage() {
                         <div className="flex-1">
                           <p className="font-semibold">{booking.customer_name}</p>
                           <p className="text-sm text-muted-foreground">{booking.booking_phone}</p>
-                          <p className="text-sm">{booking.services?.name} - {booking.booking_time}</p>
+                          <p className="text-sm">
+                            {booking.services?.name} - {booking.booking_time}
+                            {booking.staff && <span className="text-muted-foreground"> • {booking.staff.name}</span>}
+                          </p>
                         </div>
                         <div className="flex items-center gap-3">
                           <Badge className={getStatusColor(booking.status)}>
@@ -152,6 +158,12 @@ export default function BookingsPage() {
                               <p className="text-muted-foreground">Date</p>
                               <p className="font-medium">{booking.booking_date}</p>
                             </div>
+                            {booking.staff && (
+                              <div>
+                                <p className="text-muted-foreground">Staff</p>
+                                <p className="font-medium">{booking.staff.name}</p>
+                              </div>
+                            )}
                           </div>
 
                           {call?.recording_url && (
