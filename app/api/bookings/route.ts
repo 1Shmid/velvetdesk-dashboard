@@ -18,7 +18,8 @@ export async function GET() {
     .from('bookings')
     .select(`
       *,
-      services (name, price, duration)
+      services (name, price, duration),
+      staff (name)
     `)
     .eq('business_id', session.user.businessId)
     .order('booking_date', { ascending: false });
