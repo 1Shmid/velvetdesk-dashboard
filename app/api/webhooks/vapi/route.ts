@@ -24,6 +24,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No call data' }, { status: 400 });
     }
 
+    // Extract assigned_staff from checkAvailability tool result
+    const messages = artifact?.messages || [];
+    let assignedStaffId: string | null = null;
+
+    for (const msg of messages) {
+      if (msg.role === 'tool_call_result' && msg.name === 'checkAvailability') {
+        try {
+          const result = JSON.parse(msg.result);
+          assignedStaffId = result.assigned_staff?.id || null;
+          if (assignedStaffId) {
+            console.log('✅ Extracted staff_id from checkAvailability:', assignedStaffId);
+            break;
+          }
+        } catch (e) {
+          console.error('Failed to parse checkAvailability result:', e);
+        }
+      }
+    }
+
     const { data: business, error: businessError } = await supabase
       .from('businesses')
       .select('id')
@@ -318,7 +337,7 @@ export async function POST(request: Request) {
             booking_date: finalBookingDate,
             booking_time: finalBookingTime,
             status: 'booked',
-            staff_id: bookingOutput.assigned_staff?.id || bookingOutput.staff_id || null
+            staff_id: assignedStaffId
           })
           .select()
           .single();
@@ -347,7 +366,7 @@ export async function POST(request: Request) {
               booking_date: finalBookingDate,
               booking_time: finalBookingTime,
               duration: services[0].duration,
-            }, bookingOutput.assigned_staff?.id || bookingOutput.staff_id || null);
+            }, assignedStaffId ?? undefined);
 
             // Update booking with calendar_event_id
             if (calendarEventId) {
