@@ -12,118 +12,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': '*',
 };
 
-// Spanish weekday mapping
-const SPANISH_WEEKDAYS: { [key: string]: number } = {
-  'domingo': 0,
-  'lunes': 1,
-  'martes': 2,
-  'miércoles': 3,
-  'miercoles': 3, // without accent
-  'jueves': 4,
-  'viernes': 5,
-  'sábado': 6,
-  'sabado': 6 // without accent
-};
-
 // English weekday mapping (for working_hours table)
 const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
-/**
- * Calculate next occurrence of a weekday
- * @param weekdayStr - Spanish weekday (e.g., "lunes") or YYYY-MM-DD
- * @returns YYYY-MM-DD date string
- */
-function calculateDate(weekdayStr: string): string {
-  console.log('📅 calculateDate input:', weekdayStr);
-  
-  // If already in YYYY-MM-DD format, return as-is
-  if (/^\d{4}-\d{2}-\d{2}$/.test(weekdayStr)) {
-    console.log('✅ Already formatted date:', weekdayStr);
-    return weekdayStr;
-  }
-
-  // ✅ НОВОЕ: Handle "mañana" (tomorrow)
-  const normalized = weekdayStr.toLowerCase().trim();
-  if (normalized === 'mañana' || normalized === 'manana') {
-    const madridNow = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' });
-    const today = new Date(madridNow);
-    today.setDate(today.getDate() + 1); // Tomorrow
-    const result = today.toISOString().split('T')[0];
-    console.log(`✅ "mañana" → ${result} (tomorrow)`);
-    return result;
-  }
-
-  // Handle weekdays (lunes, martes, etc)
-  const targetDay = SPANISH_WEEKDAYS[normalized];
-
-  if (targetDay === undefined) {
-    console.error('❌ Unknown weekday:', weekdayStr);
-    // ✅ НОВОЕ: Используем Madrid timezone
-    const now = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' });
-    return new Date(now).toISOString().split('T')[0];
-  }
-
-  // ✅ НОВОЕ: Получаем текущую дату в Madrid timezone
-  const madridNow = new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' });
-  const today = new Date(madridNow);
-  const currentDay = today.getDay();
-  
-  let daysUntil = targetDay - currentDay;
-  if (daysUntil <= 0) daysUntil += 7; // next week
-  
-  const targetDate = new Date(today);
-  targetDate.setDate(today.getDate() + daysUntil);
-  
-  const result = targetDate.toISOString().split('T')[0];
-  console.log(`✅ "${weekdayStr}" → ${result} (in ${daysUntil} days, Madrid time)`);
-  
-  return result;
-}
-
-/**
- * Convert time to HH:MM format
- * @param timeStr - "12", "15:00", "3 de la tarde"
- * @returns HH:MM string
- */
-function normalizeTime(timeStr: string): string {
-  // If already HH:MM
-  if (/^\d{1,2}:\d{2}$/.test(timeStr)) return timeStr;
-  
-  const lowerTime = timeStr.toLowerCase().trim();
-  
-  // "3 de la tarde" → 15:00
-  const afternoonMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*tarde|pm)/);
-  if (afternoonMatch) {
-    const hour = parseInt(afternoonMatch[1]);
-    return `${hour === 12 ? 12 : hour + 12}:00`;
-  }
-  
-  // "10 de la mañana" → 10:00
-  const morningMatch = lowerTime.match(/(\d+)\s*(de\s*la\s*mañana|am)/);
-  if (morningMatch) {
-    const hour = parseInt(morningMatch[1]);
-    return `${hour.toString().padStart(2, '0')}:00`;
-  }
-  
-  // Just number: "5" → "05:00", "11" → "11:00", "14" → "14:00"
-  const numberMatch = lowerTime.match(/^\d+$/);
-  if (numberMatch) {
-    const hour = parseInt(lowerTime);
-    return `${hour.toString().padStart(2, '0')}:00`;
-  }
-  
-  return '12:00'; // fallback
-}
-
 export async function POST(request: NextRequest) {
+  let toolCallId: string | undefined;
+  
   try {
     const body = await request.json();
     console.log('\n🔧 ===== checkAvailability called =====');
     console.log('📥 Raw request:', JSON.stringify(body, null, 2));
 
     // Extract tool call ID
-    const toolCallId = body.message?.toolCallList?.[0]?.id || 
-                       body.message?.toolCalls?.[0]?.id;
+    toolCallId = body.message?.toolCallList?.[0]?.id || 
+                 body.message?.toolCalls?.[0]?.id;
     
     // Extract parameters
     const params = body.message?.toolCallList?.[0]?.function?.arguments ||
@@ -148,13 +50,20 @@ export async function POST(request: NextRequest) {
 
     const { service_name, booking_date, booking_time, staff_id } = rawParams;
 
-    // Parse booking data through LLM
-    console.log('🔍 Calling LLM parser:', { 
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/api/vapi/parse-booking-data`,
-      params: { service_name, booking_date, booking_time, staff_id }
-    });
+    // === LLM PARSER CALL ===
+    console.log('🔍 Calling LLM parser...');
+    console.log('   URL:', process.env.NEXT_PUBLIC_APP_URL);
+    console.log('   Endpoint:', '/api/vapi/parse-booking-data');
+    console.log('   Params:', { service_name, booking_date, booking_time, staff_id });
 
-    const parseResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/vapi/parse-booking-data`, {
+    if (!process.env.NEXT_PUBLIC_APP_URL) {
+      throw new Error('NEXT_PUBLIC_APP_URL is not defined');
+    }
+
+    const parseUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/vapi/parse-booking-data`;
+    console.log('   Full URL:', parseUrl);
+
+    const parseResponse = await fetch(parseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -166,13 +75,16 @@ export async function POST(request: NextRequest) {
       }),
     });
 
+    console.log('📡 Parser response status:', parseResponse.status);
+
     if (!parseResponse.ok) {
       const errorText = await parseResponse.text();
       console.error('❌ LLM parser failed:', { 
         status: parseResponse.status, 
+        statusText: parseResponse.statusText,
         error: errorText 
       });
-      throw new Error(`LLM parser failed: ${parseResponse.status}`);
+      throw new Error(`LLM parser failed with status ${parseResponse.status}: ${errorText}`);
     }
 
     const parseResult = await parseResponse.json();
@@ -182,26 +94,23 @@ export async function POST(request: NextRequest) {
 
     if (!normalized_date || !normalized_time) {
       console.error('❌ Invalid parser result:', parseResult);
-      throw new Error('Parser returned invalid data');
+      throw new Error(`Parser returned invalid data: normalized_date=${normalized_date}, normalized_time=${normalized_time}`);
     }
 
-    // Use LLM-parsed date and time
     const actualDate = normalized_date;
     const actualTime = normalized_time;
     const resolvedStaffId = staff_name_or_id;
 
-    console.log('✨ LLM Parsed:', { 
-      service_name, 
+    console.log('✅ Final parsed values:', { 
       actualDate, 
       actualTime,
       resolvedStaffId,
-      original: { booking_date, booking_time, staff_id }
+      original: { booking_date, booking_time }
     });
 
-    // Get assistant_id from call context
+    // === BUSINESS LOOKUP ===
     const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2';
 
-    // Find business by assistant_id
     const { data: business } = await supabase
       .from('businesses')
       .select('id')
@@ -224,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🏢 Business ID:', business.id);
 
-    // Find service by name (case-insensitive, trim spaces)
+    // === SERVICE LOOKUP ===
     const { data: service, error: serviceError } = await supabase
       .from('services')
       .select('id, name, duration')
@@ -248,7 +157,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Found service:', { id: service.id, name: service.name, duration: service.duration });
 
-    // Check working hours
+    // === WORKING HOURS CHECK ===
     const targetDate = new Date(actualDate);
     const dayOfWeek = WEEKDAY_NAMES[targetDate.getDay()];
     
@@ -300,8 +209,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Within working hours:', { requestedTime, openTime, closeTime });
 
-    
-    // Use Google Calendar checkAvailability
+    // === GOOGLE CALENDAR AVAILABILITY CHECK ===
     const { checkAvailability: checkGoogleAvailability } = await import('@/lib/google-calendar');
     
     const availability = await checkGoogleAvailability(
@@ -354,11 +262,11 @@ export async function POST(request: NextRequest) {
     }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('❌ checkAvailability error:', error);
+    console.error('❌❌❌ checkAvailability FATAL ERROR ❌❌❌');
+    console.error('Error details:', error);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     console.log('===== checkAvailability END (ERROR) =====\n');
-    
-    const body = await request.json().catch(() => ({}));
-    const toolCallId = body.message?.toolCallList?.[0]?.id;
     
     return NextResponse.json({
       results: [{
@@ -366,6 +274,7 @@ export async function POST(request: NextRequest) {
         result: JSON.stringify({ 
           available: false,
           reason: 'Error interno',
+          message: 'Lo siento, hubo un error procesando tu solicitud',
           suggested_times: []
         })
       }]
