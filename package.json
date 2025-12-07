@@ -7,9 +7,12 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "reset-test-data": "tsx --env-file=.env.local scripts/reset-test-data.ts"
+    "reset-test-data": "tsx --env-file=.env.local scripts/reset-test-data.ts",
+    "vapi:export": "node scripts/export-vapi-config.js",
+    "vapi:update": "node scripts/update-vapi-prompt.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -105,13 +105,11 @@ function normalizeTime(timeStr: string): string {
     return `${hour.toString().padStart(2, '0')}:00`;
   }
   
-  // Just number: "5" → assume afternoon if < 12
+  // Just number: "5" → "05:00", "11" → "11:00", "14" → "14:00"
   const numberMatch = lowerTime.match(/^\d+$/);
   if (numberMatch) {
     const hour = parseInt(lowerTime);
-    // ✅ НОВАЯ ЛОГИКА: если < 12 → предполагаем tarde
-    const adjustedHour = (hour >= 1 && hour < 12) ? hour + 12 : hour;
-    return `${adjustedHour.toString().padStart(2, '0')}:00`;
+    return `${hour.toString().padStart(2, '0')}:00`;
   }
   
   return '12:00'; // fallback
@@ -148,18 +146,34 @@ export async function POST(request: NextRequest) {
     const rawParams = typeof params === 'string' ? JSON.parse(params) : params;
     console.log('📋 Raw parameters:', rawParams);
 
-    const { service_name, booking_date, booking_time } = rawParams;
-    const staff_id = rawParams.staff_id || null;
+    const { service_name, booking_date, booking_time, staff_id } = rawParams;
 
-    // Calculate actual date and normalize time
-    const actualDate = calculateDate(booking_date);
-    const actualTime = normalizeTime(booking_time);
+    // Parse booking data through LLM
+    const parseResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/vapi/parse-booking-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_name,
+        booking_date,
+        booking_time,
+        staff_id: staff_id || null,
+        language: 'es',
+      }),
+    });
 
-    console.log('✨ Processed:', { 
+    const { normalized_date, normalized_time, staff_name_or_id } = await parseResponse.json();
+
+    // Use LLM-parsed date and time
+    const actualDate = normalized_date;
+    const actualTime = normalized_time;
+    const resolvedStaffId = staff_name_or_id;
+
+    console.log('✨ LLM Parsed:', { 
       service_name, 
       actualDate, 
       actualTime,
-      original: { booking_date, booking_time }
+      resolvedStaffId,
+      original: { booking_date, booking_time, staff_id }
     });
 
     // Get assistant_id from call context
@@ -273,7 +287,7 @@ export async function POST(request: NextRequest) {
       actualDate,
       actualTime,
       service.duration,
-      staff_id || undefined
+      resolvedStaffId || undefined
     );
 
     console.log('✅ Availability result:', availability);
