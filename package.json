@@ -9,7 +9,7 @@
     "lint": "eslint",
     "reset-test-data": "tsx --env-file=.env.local scripts/reset-test-data.ts",
     "vapi:export": "node scripts/export-vapi-config.js",
-    "vapi:update": "node scripts/update-vapi-prompt.js"
+    "vapi:update": "node scripts/update-vapi-assistant.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -31,11 +31,11 @@
     "dotenv": "^17.2.3",
     "googleapis": "^165.0.0",
     "lucide-react": "^0.545.0",
-    "next": "15.5.5",
+    "next": "^16.0.7",
     "next-auth": "^5.0.0-beta.25",
-    "react": "19.1.0",
+    "react": "^19.2.1",
     "react-day-picker": "^9.11.1",
-    "react-dom": "19.1.0",
+    "react-dom": "^19.2.1",
     "recharts": "^3.3.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7"

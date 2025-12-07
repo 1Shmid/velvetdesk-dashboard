@@ -149,6 +149,11 @@ export async function POST(request: NextRequest) {
     const { service_name, booking_date, booking_time, staff_id } = rawParams;
 
     // Parse booking data through LLM
+    console.log('🔍 Calling LLM parser:', { 
+      url: `${process.env.NEXT_PUBLIC_APP_URL}/api/vapi/parse-booking-data`,
+      params: { service_name, booking_date, booking_time, staff_id }
+    });
+
     const parseResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/vapi/parse-booking-data`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -161,7 +166,24 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    const { normalized_date, normalized_time, staff_name_or_id } = await parseResponse.json();
+    if (!parseResponse.ok) {
+      const errorText = await parseResponse.text();
+      console.error('❌ LLM parser failed:', { 
+        status: parseResponse.status, 
+        error: errorText 
+      });
+      throw new Error(`LLM parser failed: ${parseResponse.status}`);
+    }
+
+    const parseResult = await parseResponse.json();
+    console.log('✨ LLM Parser SUCCESS:', parseResult);
+
+    const { normalized_date, normalized_time, staff_name_or_id } = parseResult;
+
+    if (!normalized_date || !normalized_time) {
+      console.error('❌ Invalid parser result:', parseResult);
+      throw new Error('Parser returned invalid data');
+    }
 
     // Use LLM-parsed date and time
     const actualDate = normalized_date;
