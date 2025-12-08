@@ -345,7 +345,7 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
       return { available: false, suggestedTimes };
     } catch (error) {
       console.error('❌ Availability check failed:', error);
-      return { available: true, suggestedTimes: [] };
+      return { available: false, suggestedTimes: [] };
     }
   }
 
