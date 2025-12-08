@@ -232,6 +232,8 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
           end: new Date(event.end.dateTime || event.end.date),
         }));
 
+        console.log(`📅 ${staff.name} has ${bookedSlots.length} events at ${bookingTime}`);
+
         const hasConflict = bookedSlots.some(slot => {
           return (
             (requestedStart >= slot.start && requestedStart < slot.end) ||
@@ -267,6 +269,8 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
         .eq('is_active', true)
         .order('name');
 
+        console.log('📋 All staff for availability check:', allStaff);
+
       if (!allStaff || allStaff.length === 0) {
         return { available: false, suggestedTimes: [] };
       }
@@ -275,6 +279,7 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
       const availableStaff: Array<{ id: string; name: string }> = [];
 
       for (const staff of allStaff) {
+        console.log(`🔍 Checking calendar for ${staff.name} (${staff.calendar_id})`);
         const { data: events } = await calendar.events.list({
           calendarId: staff.calendar_id,
           timeMin: dayStart.toISOString(),
@@ -325,6 +330,9 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
 
           // Check if ANY staff is available at this time
           for (const staff of allStaff) {
+
+            console.log(`🔍 Checking calendar for ${staff.name} (${staff.calendar_id})`);
+
             const { data: events } = await calendar.events.list({
               calendarId: staff.calendar_id,
               timeMin: slotStart.toISOString(),
