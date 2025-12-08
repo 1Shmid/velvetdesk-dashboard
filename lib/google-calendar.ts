@@ -293,6 +293,13 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
           end: new Date(event.end.dateTime || event.end.date),
         }));
 
+        console.log(`📅 ${staff.name} has ${bookedSlots.length} events on ${bookingDate} at ${bookingTime}:`,
+          bookedSlots.map(s => ({ 
+            start: s.start.toISOString(), 
+            end: s.end.toISOString() 
+          }))
+        );
+
         const hasConflict = bookedSlots.some(slot => {
           return (
             (requestedStart >= slot.start && requestedStart < slot.end) ||
