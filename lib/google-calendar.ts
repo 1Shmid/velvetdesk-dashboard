@@ -209,10 +209,26 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
       const offsetHours = getMadridOffsetHours(bookingDate);
 
       // Create UTC date by subtracting Madrid offset
-      const requestedStart = new Date(`${bookingDate}T${String(madridHour).padStart(2, '0')}:${String(madridMinute).padStart(2, '0')}:00Z`);
-      requestedStart.setHours(requestedStart.getHours() - offsetHours);
+      // Parse Madrid time and convert to UTC for comparison with Google Calendar
+      const [hours, minutes] = bookingTime.split(':').map(Number);
+      const madridDate = new Date(`${bookingDate}T00:00:00Z`);
 
+      // Madrid offset: UTC+1 (winter), UTC+2 (summer)
+      const month = madridDate.getMonth() + 1;
+      const madridOffset = (month >= 3 && month <= 10) ? 2 : 1;
+
+      // Create UTC date by subtracting Madrid offset
+      madridDate.setUTCHours(hours - madridOffset, minutes, 0, 0);
+
+      const requestedStart = madridDate;
       const requestedEnd = new Date(requestedStart.getTime() + duration * 60000);
+
+      console.log('🕐 Time conversion:', {
+        input: `${bookingDate} ${bookingTime}`,
+        madridOffset: `UTC+${madridOffset}`,
+        requestedStartUTC: requestedStart.toISOString(),
+        requestedEndUTC: requestedEnd.toISOString()
+      });
 
       const dayStart = new Date(bookingDate);
       dayStart.setHours(0, 0, 0, 0);
