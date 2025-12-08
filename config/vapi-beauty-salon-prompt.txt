@@ -7,7 +7,7 @@ Ayudar a clientes a:
 - Modificar o cancelar citas existentes
 - Responder preguntas sobre servicios y disponibilidad
 
-Context: Today's date: {{now}}
+Context: {{currentDateTime}}
 
 # CRITICAL RULES
 

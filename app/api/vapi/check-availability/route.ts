@@ -50,6 +50,31 @@ export async function POST(request: NextRequest) {
 
     const { service_name, booking_date, booking_time, staff_id } = rawParams;
 
+    // === BUSINESS LOOKUP ===
+    const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2';
+
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('vapi_assistant_id', assistantId)
+      .single();
+
+    if (!business) {
+      console.error('❌ Business not found for assistant:', assistantId);
+      return NextResponse.json({
+        results: [{
+          toolCallId: toolCallId,
+          result: JSON.stringify({ 
+            available: false,
+            reason: 'Business not found',
+            suggested_times: []
+          })
+        }]
+      }, { headers: corsHeaders });
+    }
+
+    console.log('🏢 Business ID:', business.id);
+
     // === LLM PARSER CALL ===
     console.log('🔍 Calling LLM parser...');
     console.log('   URL:', process.env.NEXT_PUBLIC_APP_URL);
@@ -71,6 +96,7 @@ export async function POST(request: NextRequest) {
         booking_date,
         booking_time,
         staff_id: staff_id || null,
+        business_id: business.id,
         language: 'es',
       }),
     });
@@ -107,31 +133,6 @@ export async function POST(request: NextRequest) {
       resolvedStaffId,
       original: { booking_date, booking_time }
     });
-
-    // === BUSINESS LOOKUP ===
-    const assistantId = body.message?.call?.assistantId || 'db9394fa-ad57-4be0-b693-13e43a8a6aa2';
-
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('vapi_assistant_id', assistantId)
-      .single();
-
-    if (!business) {
-      console.error('❌ Business not found for assistant:', assistantId);
-      return NextResponse.json({
-        results: [{
-          toolCallId: toolCallId,
-          result: JSON.stringify({ 
-            available: false,
-            reason: 'Business not found',
-            suggested_times: []
-          })
-        }]
-      }, { headers: corsHeaders });
-    }
-
-    console.log('🏢 Business ID:', business.id);
 
     // === SERVICE LOOKUP ===
     const { data: service, error: serviceError } = await supabase
