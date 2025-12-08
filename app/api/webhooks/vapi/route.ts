@@ -44,7 +44,6 @@ export async function POST(request: Request) {
             booking_time: actualTime
           });
           
-          if (assignedStaffId && actualDate && actualTime) break;
         } catch (e) {
           console.error('Failed to parse checkAvailability result:', e);
         }
