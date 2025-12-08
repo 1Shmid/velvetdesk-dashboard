@@ -8,34 +8,34 @@ export async function POST(request: Request) {
   const { service_name, booking_date, booking_time, staff_id, language, business_id } = await request.json();
 
   // Get working hours for this business
-let workingHours = { open: '09:00', close: '20:00' }; // default
-if (business_id) {
-  const { createClient } = await import('@supabase/supabase-js');
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-  
-  // Get typical working hours (use Monday as reference)
-  const { data: hours } = await supabase
-    .from('working_hours')
-    .select('open_time, close_time')
-    .eq('business_id', business_id)
-    .eq('day', 'monday')
-    .eq('is_closed', false)
-    .single();
-  
-  if (hours) {
-    workingHours = {
-      open: hours.open_time.slice(0, 5),
-      close: hours.close_time.slice(0, 5)
-    };
+  let workingHours = { open: '09:00', close: '20:00' }; // default
+  if (business_id) {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    // Get typical working hours (use Monday as reference)
+    const { data: hours } = await supabase
+      .from('working_hours')
+      .select('open_time, close_time')
+      .eq('business_id', business_id)
+      .eq('day', 'monday')
+      .eq('is_closed', false)
+      .single();
+    
+    if (hours) {
+      workingHours = {
+        open: hours.open_time.slice(0, 5),
+        close: hours.close_time.slice(0, 5)
+      };
+    }
   }
-}
 
-const systemPrompt = `You are a JSON parser. Return ONLY valid JSON, no explanations.`;
+  const systemPrompt = `You are a JSON parser. Return ONLY valid JSON, no explanations.`;
 
-const prompt = `Parse this booking to JSON format:
+  const prompt = `Parse this booking to JSON format:
 - service_name: "${service_name}"
 - booking_date: "${booking_date}"
 - booking_time: "${booking_time}"
@@ -67,14 +67,14 @@ Output: {"normalized_date": "2025-12-09", "normalized_time": "15:00", "staff_nam
 
 Return only JSON with: normalized_date, normalized_time, staff_name_or_id, disambiguation_needed`;
 
-const message = await anthropic.messages.create({
-  model: 'claude-3-5-haiku-20241022',
-  max_tokens: 200,
-  system: systemPrompt,
-  messages: [{ role: 'user', content: prompt }],
-});
+  const message = await anthropic.messages.create({
+    model: 'claude-3-5-haiku-20241022',
+    max_tokens: 200,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: prompt }],
+  });
 
-const textBlock = message.content[0];
-const result = JSON.parse(textBlock.type === 'text' ? textBlock.text : '{}');
-return Response.json(result);
+  const textBlock = message.content[0];
+  const result = JSON.parse(textBlock.type === 'text' ? textBlock.text : '{}');
+  return Response.json(result);
 }
