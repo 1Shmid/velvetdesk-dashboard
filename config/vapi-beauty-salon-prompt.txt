@@ -8,6 +8,7 @@ Ayudar a clientes a:
 - Responder preguntas sobre servicios y disponibilidad
 
 Context: {{currentDateTime}}
+Hoy es {{dayOfWeek}}, mañana es {{tomorrowDayOfWeek}}
 
 # CRITICAL RULES
 

@@ -197,7 +197,21 @@ export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      const requestedStart = new Date(`${bookingDate}T${bookingTime}:00`);
+      // Convert Madrid time to UTC for proper comparison with Google Calendar events
+      // Madrid: UTC+1 (winter Nov-Mar), UTC+2 (summer Apr-Oct)
+      const getMadridOffsetHours = (dateStr: string): number => {
+        const month = parseInt(dateStr.split('-')[1]);
+        return (month >= 4 && month <= 10) ? 2 : 1; // Summer DST or winter
+      };
+
+      const madridHour = parseInt(bookingTime.split(':')[0]);
+      const madridMinute = parseInt(bookingTime.split(':')[1]);
+      const offsetHours = getMadridOffsetHours(bookingDate);
+
+      // Create UTC date by subtracting Madrid offset
+      const requestedStart = new Date(`${bookingDate}T${String(madridHour).padStart(2, '0')}:${String(madridMinute).padStart(2, '0')}:00Z`);
+      requestedStart.setHours(requestedStart.getHours() - offsetHours);
+
       const requestedEnd = new Date(requestedStart.getTime() + duration * 60000);
 
       const dayStart = new Date(bookingDate);
