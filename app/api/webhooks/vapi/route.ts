@@ -281,6 +281,7 @@ export async function POST(request: Request) {
           .toLowerCase()
           .replace(/corte de pelo/gi, 'corte de cabello')
           .replace(/tinte de pelo/gi, 'tinte y coloración')
+          .replace(/\bcura\b/gi, 'pedicura') 
           .trim();
       };
 
