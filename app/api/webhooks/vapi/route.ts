@@ -247,10 +247,17 @@ export async function POST(request: Request) {
 
 
     // ✅ FIX: Don't create booking if this was a modification/cancellation
-    const isModification = transcript.toLowerCase().includes('cambiar') || 
-                          transcript.toLowerCase().includes('modificar') ||
-                          transcript.toLowerCase().includes('mover');
-    const isCancellation = transcript.toLowerCase().includes('cancelar');
+    // CRITICAL: Check only USER messages, not full transcript (AI can say these words too!)
+    const userMessages = messages
+      .filter((msg: any) => msg.role === 'user')
+      .map((msg: any) => msg.message || msg.content || '')
+      .join(' ')
+      .toLowerCase();
+
+    const isModification = userMessages.includes('cambiar') || 
+                          userMessages.includes('modificar') ||
+                          userMessages.includes('mover');
+    const isCancellation = userMessages.includes('cancelar');
 
     if (isModification || isCancellation) {
       console.log('⚠️ Skipping booking creation - this was a modification/cancellation');
