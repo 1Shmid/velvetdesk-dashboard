@@ -24,19 +24,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No call data' }, { status: 400 });
     }
 
-    // Extract assigned_staff from checkAvailability tool result
+   // Extract assigned_staff, actual_date, and booking_time from checkAvailability
     const messages = artifact?.messages || [];
     let assignedStaffId: string | null = null;
+    let actualDate: string | null = null;
+    let actualTime: string | null = null;
 
     for (const msg of messages) {
       if (msg.role === 'tool_call_result' && msg.name === 'checkAvailability') {
         try {
           const result = JSON.parse(msg.result);
           assignedStaffId = result.assigned_staff?.id || null;
-          if (assignedStaffId) {
-            console.log('✅ Extracted staff_id from checkAvailability:', assignedStaffId);
-            break;
-          }
+          actualDate = result.actual_date || null;
+          actualTime = result.booking_time || null;
+          
+          console.log('✅ Extracted from checkAvailability:', {
+            staff_id: assignedStaffId,
+            actual_date: actualDate,
+            booking_time: actualTime
+          });
+          
+          if (assignedStaffId && actualDate && actualTime) break;
         } catch (e) {
           console.error('Failed to parse checkAvailability result:', e);
         }
@@ -226,32 +234,18 @@ export async function POST(request: Request) {
     return '';
   };
 
-    const parsedDate = parseBookingDate(bookingDate);
-    const parsedTime = parseBookingTime(bookingTime);
+    // CRITICAL: Use actual_date and booking_time from checkAvailability
+    // This is the source of truth because LLM parser already normalized the date/time
+    const finalBookingDate = actualDate || parseBookingDate(bookingDate);
+    const finalBookingTime = actualTime || parseBookingTime(bookingTime);
 
-    // Исправляем дату если в прошлом
-    const fixPastDate = (dateStr: string): string => {
-      if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
-      }
+    console.log('📅 Final booking data:', {
+      date: finalBookingDate,
+      time: finalBookingTime,
+      source: actualDate ? 'checkAvailability (accurate)' : 'fallback parser'
+    });
 
-      const bookingDate = new Date(dateStr);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (bookingDate < today) {
-        bookingDate.setDate(bookingDate.getDate() + 7);
-        console.log(`📅 Date was in past, moved forward: ${dateStr} → ${bookingDate.toISOString().split('T')[0]}`);
-        return bookingDate.toISOString().split('T')[0];
-      }
-      
-      return dateStr;
-    };
 
-    const finalBookingDate = fixPastDate(parsedDate);
-    const finalBookingTime = parsedTime;
 
     // ✅ FIX: Don't create booking if this was a modification/cancellation
     const isModification = transcript.toLowerCase().includes('cambiar') || 
