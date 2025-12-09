@@ -72,6 +72,12 @@ export async function POST(request: NextRequest) {
       `${h.day}: ${h.open_time}-${h.close_time}`
     ).join('; ') || 'Sin horario';
 
+    // Extract overall working hours range
+    const openTimes = hours?.map(h => h.open_time) || [];
+    const closeTimes = hours?.map(h => h.close_time) || [];
+    const earliestOpen = openTimes.length ? openTimes.sort()[0] : '09:00';
+    const latestClose = closeTimes.length ? closeTimes.sort().reverse()[0] : '20:00';               
+
     // Include service names list for AI matching
     const serviceNames = services?.map(s => s.name).join(', ') || '';
 
@@ -86,11 +92,13 @@ export async function POST(request: NextRequest) {
           toolCallId: toolCallId,
           result: `AVAILABLE_SERVICES: ${serviceNames}
 
-${servicesText}
+          ${servicesText}
 
-Horario: ${hoursText}.
+          Horario: ${hoursText}.
 
-IMPORTANT: When customer requests a service, use EXACT name from AVAILABLE_SERVICES list.`
+          Horario general: ${earliestOpen} - ${latestClose}
+
+          IMPORTANT: When customer requests a service, use EXACT name from AVAILABLE_SERVICES list.`
         }
       ]
     }, { headers: corsHeaders });
