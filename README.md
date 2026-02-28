@@ -83,5 +83,5 @@ Each business operates in full isolation:
 
 ## Related
 
-→ [velvetdesk-landing](https://github.com/1Shmid/velvetdesk-landing) — voice AI engine, booking API, and system architecture  
+→ [velvetdesk-landing](https://github.com/1Shmid/velvetdesk-landing) — project overview, architecture, and business model 
 → [Ivan Shmidik on LinkedIn](https://www.linkedin.com/in/ivan-shmidik)
