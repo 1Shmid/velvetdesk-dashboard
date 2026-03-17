@@ -75,7 +75,7 @@ Each business operates in full isolation:
 
 ## Delivery
 
-- Part of a 0 → production build completed in under 12 months
+- Part of a 0 → production build completed in under 6 months
 - Launched, demonstrated to investors, formally handed over
 - Exit completed without operational or reputational issues
 
